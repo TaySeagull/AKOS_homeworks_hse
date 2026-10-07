@@ -1,0 +1,15 @@
+delay_ms=0
+shift_limit=30
+escalation_enabled=1
+return_to_base=1
+strategy=NEAREST
+
+[DISTRICTS]
+BASE 0 1
+NORTH 1 0
+
+[TEAMS]
+1 MEDIC 30 BASE
+
+[CALLS]
+1 0 NORTH 1 1 1 FIRE 5 10 0 0
