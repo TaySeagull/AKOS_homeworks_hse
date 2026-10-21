@@ -1,0 +1,17 @@
+delay_ms=0
+shift_limit=50
+escalation_enabled=0
+return_to_base=0
+strategy=FASTEST
+
+[DISTRICTS]
+BASE 0 10 2
+NORTH 10 0 8
+EAST 2 8 0
+
+[TEAMS]
+1 MEDIC 30 BASE
+2 MEDIC 60 NORTH
+
+[CALLS]
+1 0 EAST 1 1 1 MEDIC 5 20 0 0

@@ -1,0 +1,47 @@
+# Emergency Dispatch Simulator configuration
+# Time values are minutes from shift start.
+#
+# SETTINGS
+delay_ms=120
+shift_limit=720
+escalation_enabled=1
+return_to_base=1
+strategy=NEAREST
+
+[DISTRICTS]
+# name     travel times to districts in declaration order
+BASE       0  6  8  5  9
+NORTH      6  0  5  7  4
+EAST       8  5  0  6  3
+WEST       5  7  6  0  8
+SOUTH      9  4  3  8  0
+
+[TEAMS]
+# id  specialization  speed  district
+1 MEDIC    30 BASE
+2 MEDIC    42 NORTH
+3 REANIM   38 EAST
+4 REANIM   28 WEST
+5 FIRE     35 SOUTH
+6 POLICE   45 BASE
+
+[CALLS]
+# id arrival district x y priority spec service max_wait escalation cancel
+1  5   EAST   8 3  3 MEDIC  12 25 8  0
+2  12  WEST   2 7  1 REANIM 18 30 0  0
+3  18  NORTH  5 9  2 MEDIC  9  20 10 0
+4  25  SOUTH  7 1  3 FIRE   15 35 15 0
+5  32  EAST   3 4  2 REANIM 12 22 7  0
+6  41  BASE   1 1  3 POLICE 8  25 10 0
+7  47  WEST   9 2  2 MEDIC  14 20 6  0
+8  55  SOUTH  4 8  1 FIRE   20 40 0  0
+9  65  NORTH  6 6  3 MEDIC  10 18 8  0
+10 72  EAST   2 2  2 REANIM 16 25 10 0
+11 85  WEST   5 3  3 MEDIC  11 18 6  12
+12 100 SOUTH  8 8  2 FIRE   13 30 10 0
+13 115 NORTH  3 7  1 REANIM 22 35 0 0
+14 130 EAST   6 5  3 MEDIC  8  20 8  0
+15 145 BASE   1 4  2 POLICE 7  18 6  0
+16 165 WEST   9 9  3 MEDIC  12 22 10 0
+17 180 SOUTH  2 6  2 FIRE   18 30 10 0
+18 200 EAST   7 3  3 REANIM 10 20 7 0
