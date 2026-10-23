@@ -1,0 +1,19 @@
+[00:00:00] SHIFT STARTED: districts=2 teams=1 calls=1
+[00:00:00] CALL #001 ARRIVED: district=NORTH priority=1 spec=MEDIC
+[00:00:00] DISPATCH: CALL #001 priority=1 spec=MEDIC -> B1 (NEAREST), TIME=1 min
+[00:00:01] B1 ARRIVED at NORTH for CALL #001; service started
+[00:00:06] CALL #001 SERVICE COMPLETED by B1; total wait=1 min
+[00:00:06] B1 RELEASED; returning to base BASE, TIME=1 min
+[00:00:07] B1 RETURNED to base BASE and is AVAILABLE
+[00:00:50] SHIFT FINISHED
+
+=== SHIFT SUMMARY ===
+Calls received: 1
+Served: 1
+Cancelled: 0
+Unserved: 0
+Dispatches: 1
+Priority escalations: 0
+Average waiting: 1.00 min/call
+Average service: 5.00 min/call
+Simulation end: 50 min

@@ -1,0 +1,15 @@
+[00:00:00] SHIFT STARTED: districts=2 teams=1 calls=1
+[00:00:00] CALL #001 ARRIVED: district=NORTH priority=1 spec=FIRE
+[00:00:30] CALL #001 UNSERVED: maximum waiting time 10 min exceeded
+[00:00:30] SHIFT FINISHED
+
+=== SHIFT SUMMARY ===
+Calls received: 1
+Served: 0
+Cancelled: 0
+Unserved: 1
+Dispatches: 0
+Priority escalations: 0
+Average waiting: 0.00 min/call
+Average service: 0.00 min/call
+Simulation end: 30 min
