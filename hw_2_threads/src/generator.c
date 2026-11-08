@@ -1,12 +1,15 @@
 #define _POSIX_C_SOURCE 200809L
 #include "generator.h"
 #include "simulation.h"
+#include "threads.h"
 #include "utils.h"
 #include "utils_extra.h"
 #include <stdlib.h>
 
 /**
- * @brief Returns a pseudo-random number
+ * @brief Returns a pseudo-random number in [low, high]
+ * @details rand_r() keeps its state in sim->rng, so the same seed always
+ * produces the same sequence of calls (reproducible runs).
  * @param sim Pointer to the simulation structure
  * @param low Lower bound
  * @param high Upper bound
@@ -33,8 +36,14 @@ static int find_free_call_slot(Simulation *sim)
     for (int idx = 0; idx < sim->call_count; idx++)
     {
         CallState state = sim->calls[idx].state;
-        if (state == CALL_COMPLETED || state == CALL_CANCELLED || state == CALL_UNSERVED)
+        int closed = state == CALL_COMPLETED || state == CALL_CANCELLED || state == CALL_UNSERVED;
+
+        // the thread of a closed call is idle, it is stopped and joined
+        if (closed)
+        {
+            join_call_thread(sim, idx);
             return idx;
+        }
     }
 
     return -1;
@@ -82,7 +91,7 @@ int create_random_call(Simulation *sim)
     call->service_duration = random_between(sim, 5, 20);
     call->max_wait = random_between(sim, 15, 40);
     call->escalation_after = random_between(sim, 4, 10);
-    call->cancel_after = random_between(sim, 0, 4) == 0 ? random_between(sim, 5, 30) : 0;
+    call->cancel_after = random_between(sim, 0, 4) == 0 ? random_between(sim, 5, 30) : 0; // ~20% of callers may hang up
     call->state = CALL_PENDING;
     call->assigned_team = NO_TEAM;
     call->dispatch_time = 0;

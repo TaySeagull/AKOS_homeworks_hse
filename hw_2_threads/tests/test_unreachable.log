@@ -1,9 +1,9 @@
-[00:00] SHIFT STARTED: districts=2 teams=1 calls=1
-[00:00] CALL #001 ARRIVED: district=ISLAND (x=1, y=1) priority=1 spec=MEDIC service=5 min max_wait=15 min
-[00:00] SEARCH: no free MEDIC team can reach ISLAND; CALL #001 is queued (waiting calls: 1)
-[00:15] CALL #001 UNSERVED: maximum waiting time 15 min exceeded
-[00:15] ALL CALLS PROCESSED
-[00:15] SHIFT FINISHED
+[00:00] {CLK } SHIFT STARTED: districts=2 teams=1 calls=1; threads: clock, dispatcher, signals, 1 teams, 1 calls
+[00:00] {C001} CALL #001 ARRIVED: district=ISLAND (x=1, y=1) priority=1 spec=MEDIC service=5 min max_wait=15 min
+[00:00] {DSP } SEARCH: no free MEDIC team can reach ISLAND; CALL #001 is queued (waiting calls: 1)
+[00:15] {C001} CALL #001 UNSERVED: maximum waiting time 15 min exceeded
+[00:15] {CLK } ALL CALLS PROCESSED
+[00:15] {CLK } SHIFT FINISHED
 
 === SHIFT SUMMARY ===
 Stop reason: all calls processed
@@ -18,3 +18,4 @@ Average service: 0.00 min/call
 Simulation end: 15 min
 Processed events: 2
 Invariant violations: 0
+Threads created: 4 (mutex + condition variables)

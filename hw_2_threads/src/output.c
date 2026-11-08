@@ -1,6 +1,7 @@
 #include "output.h"
 #include "utils.h"
 #include "utils_extra.h"
+#include "sync.h"
 #include <unistd.h>
 
 #define BOX_WIDTH 62
@@ -81,6 +82,9 @@ int print_header(const Simulation *sim)
               shift,
               sim->delay_ms,
               sim->return_to_base ? "yes" : "no");
+
+    fd_printf(STDOUT_FILENO, "Threads: clock (main) + dispatcher + signal thread + %d teams + 1 per call | sync: %s\n",
+              sim->team_count, sync_flavour());
 
     if (sim->random_calls)
         fd_printf(STDOUT_FILENO, "Random calls: on | seed=%u | mean interval=%d min\n",
@@ -182,6 +186,7 @@ static void write_plain_summary(const Simulation *sim, int fd, double average_wa
     fd_printf(fd, "Simulation end: %d min\n", sim->now);
     fd_printf(fd, "Processed events: %d\n", sim->completed_events);
     fd_printf(fd, "Invariant violations: %d\n", sim->invariant_errors);
+    fd_printf(fd, "Threads created: %d (%s)\n", sim->threads_started, sync_flavour());
 }
 
 /**
@@ -247,6 +252,9 @@ int print_summary(const Simulation *sim)
     snprintf(line, sizeof(line), "Invariant violations: %d", sim->invariant_errors);
     print_box_line(line);
 
+    snprintf(line, sizeof(line), "Threads created:      %d (%s)", sim->threads_started, sync_flavour());
+    print_box_line(line);
+
     fd_printf(STDOUT_FILENO, "╚══════════════════════════════════════════════════════════════╝\n");
 
     if (sim->log_fd >= 0)
@@ -269,7 +277,7 @@ int print_usage(const char *program)
         "Usage: %s [-c config] [-d delay_ms] [-s nearest|fastest] [-l logfile]\n"
         "          [-t shift_minutes] [-r seed] [-h]\n"
         "  -c file    configuration file (default config.txt)\n"
-        "  -d ms      visual delay after every event, ms (0 = no delay)\n"
+        "  -d ms      visual delay after every model minute with events, ms (0 = no delay)\n"
         "  -s name    team selection strategy: nearest | fastest\n"
         "  -l file    log file (default dispatch.log)\n"
         "  -t min     shift length in minutes, 0 = unlimited (stop with Ctrl+C)\n"

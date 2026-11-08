@@ -142,7 +142,6 @@ static int parse_district_line(Simulation *sim, const char *line)
     int each_distrct_time[MAX_DISTRICTS];
 
     int number = sscanf(line, "%31s %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d", name, &each_distrct_time[0], &each_distrct_time[1], &each_distrct_time[2], &each_distrct_time[3], &each_distrct_time[4], &each_distrct_time[5], &each_distrct_time[6], &each_distrct_time[7], &each_distrct_time[8], &each_distrct_time[9], &each_distrct_time[10], &each_distrct_time[11], &each_distrct_time[12], &each_distrct_time[13], &each_distrct_time[14], &each_distrct_time[15]);
-    
     SOFT_ASSERT(number >= 2, "invalid district line", 0);
     SOFT_ASSERT(district_index(sim, name) < 0, "duplicate district name", 0);
 
@@ -162,7 +161,6 @@ static int parse_district_line(Simulation *sim, const char *line)
     sim->district_count++;
     return 1;
 }
-
 
 /**
  * @brief Parses a team line and updates the simulation accordingly

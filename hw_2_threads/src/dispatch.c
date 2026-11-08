@@ -104,15 +104,20 @@ int choose_team(Simulation *sim, const Call *call)
 }
 
 /**
- * @brief Tries to dispatch calls to available teams
+ * @brief One dispatching round: assigns free teams to waiting calls
  * @param sim Pointer to the simulation structure
- * @return 1 on success, 0 on failure
+ * @param out Array for the made assignments
+ * @param max Size of the array
+ * @return Number of assignments
  */
-int try_dispatch(Simulation *sim)
+int plan_dispatch(Simulation *sim, Assignment *out, int max)
 {
     SOFT_ASSERT(sim, "simulation is NULL", 0);
+    SOFT_ASSERT(out, "assignment array is NULL", 0);
 
-    for (;;)
+    int made = 0;
+
+    while (made < max)
     {
         int selected = -1, priority = 99, wait_best = -1;
 
@@ -141,38 +146,31 @@ int try_dispatch(Simulation *sim)
         if (selected < 0)
             break;
 
-        Call *call_ = &sim->calls[selected];
+        Call *call = &sim->calls[selected];
 
-        int chosen_team = choose_team(sim, call_);
-        SOFT_ASSERT(chosen_team >= 0 && chosen_team < sim->team_count, "selected team index is invalid", 0);
+        int chosen_team = choose_team(sim, call);
+        SOFT_ASSERT(chosen_team >= 0 && chosen_team < sim->team_count, "selected team index is invalid", made);
 
         Team *team = &sim->teams[chosen_team];
 
-        int time = travel_time(sim, team, call_->district);
-        SOFT_ASSERT(time >= 0, "team cannot reach call district", 0);
-
-        int from = team->district;
-
-        call_->assigned_team = team->id;
-        call_->dispatch_time = sim->now;
-        call_->state = CALL_EN_ROUTE;
+        // reserve the team and the call
+        call->assigned_team = team->id;
+        call->dispatch_time = sim->now;
+        call->state = CALL_EN_ROUTE;
         team->state = TEAM_EN_ROUTE;
-        team->call_id = call_->id;
+        team->call_id = call->id;
 
-        remove_call_deadlines(sim, call_->id); // the call does not wait any more
+        remove_call_deadlines(sim, call->id); // the call does not wait any more
 
         sim->dispatches++;
 
-        log_event(sim, "DISPATCH: CALL #%03d priority=%d spec=%s waited %d min -> B%d (%s strategy)", call_->id,
-                  call_->priority, spec_name(call_->spec), sim->now - call_->arrival, team->id, strategy_name(sim->strategy));
-        log_event(sim, "B%d DEPARTED from %s to %s, travel TIME=%d min", team->id, sim->districts[from].name,
-                  sim->districts[call_->district].name, time);
+        log_event(sim, "DISPATCH: CALL #%03d priority=%d spec=%s waited %d min -> B%d (%s strategy)", call->id,
+                  call->priority, spec_name(call->spec), sim->now - call->arrival, team->id, strategy_name(sim->strategy));
 
-        if (!schedule_event_checked(sim, sim->now + time, EV_TEAM_ARRIVAL, team->id))
-            return 0;
-
-        sleep_visual(sim);
+        out[made].team = chosen_team;
+        out[made].call = selected;
+        made++;
     }
 
-    return 1;
+    return made;
 }

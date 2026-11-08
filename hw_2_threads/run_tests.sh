@@ -10,13 +10,16 @@
 #       - received = served + cancelled + unserved.
 #  2. tests/bad/*.txt    - invalid configurations, the program must refuse
 #     them with a non-zero exit code.
-#  3. Reproducibility of the random generator (same seed -> same log).
+#  3. Reproducibility of the random generator (same seed -> same set of log
+#     lines; inside one model minute threads may print in a different order,
+#     so the logs are compared after sorting).
 #  4. Interruption by SIGINT (Ctrl+C) during a run with a visual delay.
 #  5. Command-line checks (-h, wrong -d).
 
 set -u
 
-BIN=./emergency_dispatch
+BIN=${1:-./emergency_dispatch}
+echo "### Testing $BIN"
 OUT_DIR=$(mktemp -d)
 trap 'rm -rf "$OUT_DIR"' EXIT
 
@@ -78,15 +81,19 @@ for config in tests/test_*.txt; do
         continue
     fi
 
+    # the expectations do not contain the thread tag "{B1  }", remove it
+    plain="$OUT_DIR/$name.plain"
+    sed 's/^\(\[[0-9:]*\]\) {[^}]*} /\1 /' "$log" >"$plain"
+
     ok=1
     if [ -f "$expect" ]; then
         while IFS= read -r line || [ -n "$line" ]; do
             [ -z "$line" ] && continue
             if [ "${line:0:1}" = "!" ]; then
-                if grep -Fq -- "${line:1}" "$log"; then
+                if grep -Fq -- "${line:1}" "$plain"; then
                     fail "unexpected: ${line:1}"; ok=0; break
                 fi
-            elif ! grep -Fq -- "$line" "$log"; then
+            elif ! grep -Fq -- "$line" "$plain"; then
                 fail "expected: $line"; ok=0; break
             fi
         done <"$expect"
@@ -123,12 +130,40 @@ total=$((total + 1))
 printf '[TEST] %-22s ... ' "same seed, same log"
 "$BIN" -c config.txt -d 0 -r 42 -t 300 -l "$OUT_DIR/r1.log" >/dev/null 2>&1
 "$BIN" -c config.txt -d 0 -r 42 -t 300 -l "$OUT_DIR/r2.log" >/dev/null 2>&1
-if cmp -s "$OUT_DIR/r1.log" "$OUT_DIR/r2.log" && grep -q 'GENERATOR' "$OUT_DIR/r1.log" &&
+if cmp -s <(sort "$OUT_DIR/r1.log") <(sort "$OUT_DIR/r2.log") && grep -q 'GENERATOR' "$OUT_DIR/r1.log" &&
     reason=$(common_checks "$OUT_DIR/r1.log"); then
     pass
 else
     fail "${reason:-logs differ or no generated calls}"
 fi
+
+total=$((total + 1))
+printf '[TEST] %-22s ... ' "20 runs, same result"
+# the threads are scheduled differently every time, the outcome must not change
+"$BIN" -c tests/test_stress.txt -d 0 -l "$OUT_DIR/ref.log" >/dev/null 2>&1
+ok=1
+for run in $(seq 1 20); do
+    "$BIN" -c tests/test_stress.txt -d 0 -l "$OUT_DIR/run.log" >/dev/null 2>&1
+    if ! cmp -s <(sort "$OUT_DIR/ref.log") <(sort "$OUT_DIR/run.log"); then ok=0; break; fi
+done
+if [ "$ok" -eq 1 ]; then pass; else fail "run $run differs from the first one"; fi
+
+total=$((total + 1))
+printf '[TEST] %-22s ... ' "60 runs, no deadlock"
+# random scenarios with a time limit; on one CPU (taskset) the threads are
+# interleaved in other ways, a lost wake-up would show up here as a timeout
+pin=""
+command -v taskset >/dev/null 2>&1 && pin="taskset -c 0"
+ok=1
+for seed in $(seq 1 60); do
+    prefix=""
+    [ $((seed % 2)) -eq 0 ] && prefix=$pin
+    if ! timeout 10 $prefix "$BIN" -c tests/test_stress.txt -d 0 -r "$seed" -t 400 -l "$OUT_DIR/dl.log" >/dev/null 2>&1 ||
+        ! reason=$(common_checks "$OUT_DIR/dl.log"); then
+        ok=0; break
+    fi
+done
+if [ "$ok" -eq 1 ]; then pass; else fail "seed $seed: hang, crash or ${reason:-bad summary}"; fi
 
 echo "=== Interruption ==="
 total=$((total + 1))

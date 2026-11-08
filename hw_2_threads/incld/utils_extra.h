@@ -21,14 +21,21 @@ int find_call_index_by_id(const Simulation *sim, int call_id);
 
 int find_team_index_by_id(const Simulation *sim, int team_id);
 
-// writes the entire buffer to the given file descriptor, returns 0 on success, -1 on error
 int write_all(int fd, const char *buf, size_t len);
 
-// writes formatted output to the given file descriptor, returns the number of bytes written or -1 on error
 int fd_printf(int fd, const char *format, ...) __attribute__((format(printf, 2, 3)));
 
 int log_event(Simulation *sim, const char *format, ...) __attribute__((format(printf, 2, 3)));
 
 int sleep_visual(const Simulation *sim);
+
+// Sets the identification tag of the current thread for log messages
+void set_thread_tag(const char *tag);
+
+// Locks the output mutex to prevent concurrent output from multiple threads
+void output_begin(Simulation *sim);
+
+// Unlocks the output mutex after the output operation is completed
+void output_end(Simulation *sim);
 
 #endif

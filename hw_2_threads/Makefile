@@ -2,51 +2,64 @@
 CC := gcc
 
 # DIRECTORIES
-BUILD_DIR := build
-SRC_DIR   := src
-INC_DIR   := incld
+BUILD_DIR    := build
+BUILD_DIR_CV := build_cv
+SRC_DIR      := src
+INC_DIR      := incld
 
 # CFLAGS
-CFLAGS := -std=c11 -Wall -Wextra -Werror
-CFLAGS += -I$(INC_DIR)
+CFLAGS   := -std=c11 -Wall -Wextra -Werror -pthread
+CFLAGS   += -I$(INC_DIR)
 DEPFLAGS := -MMD -MP # generate header dependencies (build/*.d)
 
-# SOURCES
+# SOURCES (common part of both programs)
 C_SRCS := $(SRC_DIR)/main.c \
           $(SRC_DIR)/config.c \
           $(SRC_DIR)/event_queue.c \
           $(SRC_DIR)/utils.c \
           $(SRC_DIR)/simulation.c \
           $(SRC_DIR)/dispatch.c \
-          $(SRC_DIR)/event_handlers.c \
           $(SRC_DIR)/output.c \
-          $(SRC_DIR)/generator.c
+          $(SRC_DIR)/generator.c \
+          $(SRC_DIR)/threads.c \
+          $(SRC_DIR)/threads/team_thread.c \
+          $(SRC_DIR)/threads/dispatcher_thread.c \
+          $(SRC_DIR)/threads/signal_thread.c \
+          $(SRC_DIR)/threads/call_thread.c \
 
-# OBJECT FILES
-C_OBJS := $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(C_SRCS))
+# main program: mutexes + semaphores
+OBJS    := $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(C_SRCS) $(SRC_DIR)/sync_sem.c)
+# second program: mutexes + condition variables (additional requirement 8)
+OBJS_CV := $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR_CV)/%.o,$(C_SRCS) $(SRC_DIR)/sync_cv.c)
 
-# TARGET
-TARGET := emergency_dispatch
+# TARGETS
+TARGET    := emergency_dispatch
+TARGET_CV := emergency_dispatch_cv
 
-.PHONY: all clean test run dirs
+.PHONY: all clean test run
 
-all: dirs $(TARGET)
-
-# CREATE BUILD DIRECTORY
-dirs:
-	@mkdir -p $(BUILD_DIR)
+all: $(TARGET) $(TARGET_CV)
 
 # LINKING
-$(TARGET): $(C_OBJS)
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $^
+
+$(TARGET_CV): $(OBJS_CV)
 	$(CC) $(CFLAGS) -o $@ $^
 
 # COMPILING C FROM SRC/
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | dirs
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(DEPFLAGS) -c -o $@ $<
 
-# TESTING THROUGH SH SCRIPT
-test: $(TARGET)
-	@bash ./run_tests.sh
+$(BUILD_DIR_CV)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -DUSE_CONDVAR $(DEPFLAGS) -c -o $@ $<
+
+# TESTING THROUGH THE SCRIPT (both programs)
+test: all
+	@bash ./run_tests.sh ./$(TARGET)
+	@bash ./run_tests.sh ./$(TARGET_CV)
 
 # RUN PROGRAM
 run: $(TARGET)
@@ -54,10 +67,10 @@ run: $(TARGET)
 
 # CLEANING
 clean:
-	rm -rf $(BUILD_DIR)
-	rm -f $(TARGET)
-	rm -f dispatch.log test_dispatch.log
-	rm -f tests/*.log tests/*.out
+	rm -rf $(BUILD_DIR) $(BUILD_DIR_CV)
+	rm -f $(TARGET) $(TARGET_CV)
+	rm -f dispatch.log
+	rm -f tests/*.log
 
 # header dependencies
--include $(C_OBJS:.o=.d)
+-include $(OBJS:.o=.d) $(OBJS_CV:.o=.d)

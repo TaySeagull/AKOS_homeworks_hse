@@ -1,13 +1,13 @@
-[00:00] SHIFT STARTED: districts=3 teams=2 calls=1
-[00:00] CALL #001 ARRIVED: district=EAST (x=1, y=1) priority=1 spec=MEDIC service=5 min max_wait=20 min
-[00:00] DISPATCH: CALL #001 priority=1 spec=MEDIC waited 0 min -> B1 (NEAREST strategy)
-[00:00] B1 DEPARTED from BASE to EAST, travel TIME=2 min
-[00:02] B1 ARRIVED at EAST for CALL #001 (after 2 min of waiting)
-[00:02] B1 STARTED HELP on CALL #001, it will take 5 min
-[00:07] CALL #001 HELP FINISHED by B1; total wait=2 min, service=5 min
-[00:07] B1 RELEASED and AVAILABLE in district EAST
-[00:07] ALL CALLS PROCESSED
-[00:07] SHIFT FINISHED
+[00:00] {CLK } SHIFT STARTED: districts=3 teams=2 calls=1; threads: clock, dispatcher, signals, 2 teams, 1 calls
+[00:00] {C001} CALL #001 ARRIVED: district=EAST (x=1, y=1) priority=1 spec=MEDIC service=5 min max_wait=20 min
+[00:00] {DSP } DISPATCH: CALL #001 priority=1 spec=MEDIC waited 0 min -> B1 (NEAREST strategy)
+[00:00] {B1  } B1 DEPARTED from BASE to EAST for CALL #001, travel TIME=2 min
+[00:02] {B1  } B1 ARRIVED at EAST for CALL #001 (after 2 min of waiting)
+[00:02] {B1  } B1 STARTED HELP on CALL #001, it will take 5 min
+[00:07] {B1  } CALL #001 HELP FINISHED by B1; total wait=2 min, service=5 min
+[00:07] {B1  } B1 RELEASED and AVAILABLE in district EAST
+[00:07] {CLK } ALL CALLS PROCESSED
+[00:07] {CLK } SHIFT FINISHED
 
 === SHIFT SUMMARY ===
 Stop reason: all calls processed
@@ -22,3 +22,4 @@ Average service: 5.00 min/call
 Simulation end: 7 min
 Processed events: 3
 Invariant violations: 0
+Threads created: 5 (mutex + condition variables)

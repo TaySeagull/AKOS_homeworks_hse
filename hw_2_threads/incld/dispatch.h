@@ -9,6 +9,16 @@ int team_can_serve(const Team *team, const Call *call);
 
 int choose_team(Simulation *sim, const Call *call);
 
-int try_dispatch(Simulation *sim);
+/**
+ * @struct Assignment
+ * @brief Decision of the dispatcher: team index -> call index
+ */
+typedef struct
+{
+    int team;
+    int call;
+} Assignment;
+
+int plan_dispatch(Simulation *sim, Assignment *out, int max);
 
 #endif

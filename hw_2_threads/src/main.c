@@ -3,6 +3,8 @@
 #include "simulation.h"
 #include "output.h"
 #include "utils.h"
+#include "utils_extra.h"
+#include "threads.h"
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,8 +36,6 @@ static int parse_arguments(int argc, char **argv, Simulation *sim, const char **
     optind = 1; // restart getopt() from the first argument
     opterr = 1;
 
-    // c: config file path, d: delay_ms, s: strategy, l: log file path,
-    // t: shift limit, r: random generator seed, h: help
     while ((option = getopt(argc, argv, "c:d:s:l:t:r:h")) != -1)
     {
         switch (option)
@@ -92,7 +92,7 @@ static int parse_arguments(int argc, char **argv, Simulation *sim, const char **
             print_usage(argv[0]);
             return ARGS_HELP;
 
-        default:
+        default: // unknown option, getopt() has already printed the message
             print_usage(argv[0]);
             return ARGS_ERROR;
         }
@@ -165,13 +165,41 @@ int main(int argc, char **argv)
     if (!open_log_file(&sim, log_path))
         return 1;
 
-    if (!install_signal())
+    // the signals are blocked before any thread is created
+    if (!block_signals() || !init_thread_sync(&sim))
     {
         close(sim.log_fd);
         return 1;
     }
 
-    int ok = run_simulation(&sim);
+    if (!start_service_threads(&sim))
+    {
+        destroy_thread_sync(&sim);
+        close(sim.log_fd);
+        return 1;
+    }
+
+    // one thread for every configured call (the caller)
+    for (int idx = 0; idx < sim.call_count; idx++)
+    {
+        if (!start_call_thread(&sim, idx))
+        {
+            fprintf(stderr, "cannot create the thread of call #%d\n", sim.calls[idx].id);
+            stop_all_threads(&sim);
+            destroy_thread_sync(&sim);
+            close(sim.log_fd);
+            return 1;
+        }
+    }
+
+    int ok = run_simulation(&sim); // the main thread works as the clock
+
+    stop_all_threads(&sim);
+
+    // all threads are joined, the summary sees the final state
+    print_summary(&sim);
+
+    destroy_thread_sync(&sim);
 
     close(sim.log_fd);
 

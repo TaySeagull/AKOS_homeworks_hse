@@ -105,7 +105,7 @@ Event pop_event(Simulation *sim)
 }
 
 /**
- * @brief Restores the heap property for the subtree rooted at index
+ * @brief Restores the heap property for the subtree rooted at idx
  * @param sim Pointer to the simulation structure
  * @param idx Index of the root of the subtree
  */
@@ -137,6 +137,7 @@ static void sift_down(Simulation *sim, int idx)
 /**
  * @brief Removes the personal deadlines (escalation, cancellation, max_wait)
  * of a call from the queue
+ * @param sim Pointer to the simulation structure
  * @param call_id Id of the call
  * @return Number of removed events
  */

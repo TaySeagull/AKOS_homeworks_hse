@@ -1,8 +1,3 @@
-/**
- * @file generator.h
- * @brief Random call generator for the simulation
- */
-
 #ifndef GENERATOR_H
 #define GENERATOR_H
 #include "model.h"

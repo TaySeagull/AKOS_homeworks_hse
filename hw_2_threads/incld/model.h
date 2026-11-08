@@ -1,6 +1,8 @@
 #ifndef MODEL_H
 #define MODEL_H
 #include <stdio.h>
+#include <pthread.h>
+#include "sync.h"
 
 #define MAX_DISTRICTS 16 // the max number of districts in the simulation
 #define MAX_TEAMS 32     // the max number of teams in the simulation
@@ -77,7 +79,7 @@ typedef enum
     EV_SERVICE_DONE,
     EV_RETURN_DONE,
     EV_CANCEL,
-    EV_WAIT_TIMEOUT // the call reached its max_wait. Added in ver 2.
+    EV_WAIT_TIMEOUT
 } EventType;
 
 /**
@@ -92,7 +94,6 @@ typedef enum
     STOP_INTAKE_CLOSED      // SIGQUIT: no new calls, active calls were finished
 } StopReason;
 
-
 /**
  * @struct District
  * @brief District in the simulation
@@ -103,7 +104,6 @@ typedef struct
     int travel[MAX_DISTRICTS];
     int travel_count; // how many travel values were given in the configuration line
 } District;
-
 
 /**
  * @struct Team
@@ -118,6 +118,11 @@ typedef struct
     int base;
     TeamState state;
     int call_id;
+
+    //thread of the team
+    pthread_t thread;
+    Mailbox mailbox; // commands from the dispatcher and wake-ups from the clock
+    int started;     // 1 if the thread was created
 
 } Team;
 
@@ -142,6 +147,11 @@ typedef struct
     int dispatch_time;
     int service_start;
     int completion_time;
+
+    // thread of the call
+    pthread_t thread;
+    Mailbox mailbox; // wake-ups from the clock and the message of the team
+    int started;     // 1 if the thread was created
 
 } Call;
 
@@ -178,7 +188,7 @@ typedef struct
     unsigned long next_seq;
     int now;
     int delay_ms;
-    int shift_limit;
+    int shift_limit; // shift length in minutes, 0 = unlimited
     int escalation_enabled;
     int return_to_base;
     Strategy strategy;
@@ -190,11 +200,12 @@ typedef struct
     int escalations;
     int dispatches;
     int completed_events;
-    int received;          // calls that really arrived
-    int invariant_errors;  // number of detected invariant violations
-    StopReason stop_reason; // stop reason for the simulation loop
-  
-    int random_calls;      // 1 = generate calls randomly 
+    int received;          // calls that really arrived (EV_CALL_ARRIVAL processed)
+    int invariant_errors;  // number of detected invariant violations (must stay 0)
+    StopReason stop_reason;
+
+    // random call generator (used together with unlimited shift or as extra load)
+    int random_calls;      // 1 = generate calls randomly instead of / in addition to [CALLS]
     unsigned int seed;     // seed of the generator, gives a reproducible run
     unsigned int rng;      // current state of rand_r()
     int random_interval;   // mean interval between generated calls, minutes
@@ -202,9 +213,23 @@ typedef struct
 
     int intake_closed;     // 1 after SIGQUIT: new calls are not accepted any more
 
-    int log_fd;            // descriptor of the log file
+    int log_fd;            // descriptor of the log file (-1 = no log), written with write(2)
+
+    // multithread
+    pthread_mutex_t world;       // protects the whole model: teams, calls, event queue, statistics
+    pthread_mutex_t output_lock; // one output line (or box) is printed by one thread at a time
+    pthread_mutex_t control;     // protects the flags below, they are set by the signal thread
+    int stop_requested;          // SIGINT / SIGTERM
+    int close_requested;         // SIGQUIT
+    int snapshot_requested;      // SIGUSR1
+    int shutting_down;           // the signal thread must finish
+
+    Quiet quiet;                 // counter of not yet handled messages
+    Mailbox dispatcher_box;      // mailbox of the dispatcher thread
+    pthread_t dispatcher;
+    pthread_t signal_thread;
+    int threads_started;         // number of created threads (for the summary)
 
 } Simulation;
 
 #endif
-
