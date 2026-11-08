@@ -1,6 +1,3 @@
-/**
- * @file utils.h - 1st hw
- */
 #ifndef UTILS_H
 #define UTILS_H
 #include <stdio.h>

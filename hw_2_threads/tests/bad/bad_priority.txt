@@ -1,0 +1,11 @@
+delay_ms=0
+shift_limit=50
+escalation_enabled=1
+return_to_base=1
+strategy=NEAREST
+[DISTRICTS]
+BASE 0
+[TEAMS]
+1 MEDIC 30 BASE
+[CALLS]
+1 0 BASE 1 1 7 MEDIC 5 20 0 0

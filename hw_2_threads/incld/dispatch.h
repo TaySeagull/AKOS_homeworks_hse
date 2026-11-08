@@ -1,6 +1,3 @@
-/**
- * @file dispatch.h - 1st hw
- */
 #ifndef DISPATCH_H
 #define DISPATCH_H
 

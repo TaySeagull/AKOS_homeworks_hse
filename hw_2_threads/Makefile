@@ -7,8 +7,9 @@ SRC_DIR   := src
 INC_DIR   := incld
 
 # CFLAGS
-CFLAGS = -std=c11 -Wall -Wextra -Werror -pthread
+CFLAGS := -std=c11 -Wall -Wextra -Werror
 CFLAGS += -I$(INC_DIR)
+DEPFLAGS := -MMD -MP # generate header dependencies (build/*.d)
 
 # SOURCES
 C_SRCS := $(SRC_DIR)/main.c \
@@ -19,7 +20,7 @@ C_SRCS := $(SRC_DIR)/main.c \
           $(SRC_DIR)/dispatch.c \
           $(SRC_DIR)/event_handlers.c \
           $(SRC_DIR)/output.c \
-		  $(SRC_DIR)/threads.c
+          $(SRC_DIR)/generator.c
 
 # OBJECT FILES
 C_OBJS := $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(C_SRCS))
@@ -41,19 +42,22 @@ $(TARGET): $(C_OBJS)
 
 # COMPILING C FROM SRC/
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | dirs
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) $(DEPFLAGS) -c -o $@ $<
 
 # TESTING THROUGH SH SCRIPT
 test: $(TARGET)
-	@chmod +x run_tests.sh
-	@./run_tests.sh
+	@bash ./run_tests.sh
 
 # RUN PROGRAM
 run: $(TARGET)
-	./$(TARGET) -c config.txt -d 0
+	./$(TARGET) -c config.txt
 
 # CLEANING
 clean:
 	rm -rf $(BUILD_DIR)
 	rm -f $(TARGET)
 	rm -f dispatch.log test_dispatch.log
+	rm -f tests/*.log tests/*.out
+
+# header dependencies
+-include $(C_OBJS:.o=.d)

@@ -1,12 +1,11 @@
-/**
- * @file confug.c- 1st hw
- */
 #include "config.h"
 #include "utils.h"
 #include "utils_extra.h"
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <errno.h>
+#include <limits.h>
 
 #define KEY_LEN 64  // Maximum length of a key in the configuration file
 #define VAL_LEN 128 // Maximum length of a value in the configuration file
@@ -28,7 +27,35 @@ int set_defaults(Simulation *sim)
     sim->escalation_enabled = 1; // enable escalation
     sim->return_to_base = 1;     // return to base after service
     sim->strategy = STRATEGY_NEAREST;
+    sim->log_fd = -1;            // log is opened later in main()
+    sim->stop_reason = STOP_ALL_PROCESSED;
+    sim->random_calls = 0;       // calls are taken from [CALLS] only
+    sim->seed = 1;
+    sim->random_interval = 10;   // a new random call every ~10 minutes
+    sim->next_call_id = 1;
 
+    return 1;
+}
+
+/**
+ * @brief Converts a string to int and checks that the whole string is a number
+ * @param text Text to convert
+ * @param value Where to store the result
+ * @return 1 on success, 0 if the text is not an integer
+ */
+int parse_int_strict(const char *text, int *value)
+{
+    SOFT_ASSERT(text, "text is NULL", 0);
+    SOFT_ASSERT(value, "value pointer is NULL", 0);
+
+    char *end = NULL;
+    errno = 0;
+    long number = strtol(text, &end, 10);
+
+    if (end == text || *end != '\0' || errno == ERANGE || number < INT_MIN || number > INT_MAX)
+        return 0;
+
+    *value = (int)number;
     return 1;
 }
 
@@ -44,23 +71,56 @@ static int parse_settings_line(Simulation *sim, const char *line)
     SOFT_ASSERT(line, "configuration line is NULL", 0);
 
     char key[KEY_LEN], val[VAL_LEN];
-    if (sscanf(line, "%63[^=]=%127s", key, val) != 2)
+    if (sscanf(line, " %63[^= \t] = %127s", key, val) != 2)
+    {
+        fprintf(stderr, "Config error: invalid settings line: %s", line);
+        return 0;
+    }
+
+    if (!strcmp(key, "strategy"))
+    {
+        if (!strcasecmp(val, "FASTEST"))
+            sim->strategy = STRATEGY_FASTEST;
+        else if (!strcasecmp(val, "NEAREST"))
+            sim->strategy = STRATEGY_NEAREST;
+        else
+        {
+            fprintf(stderr, "Config error: unknown strategy '%s' (use NEAREST or FASTEST)\n", val);
+            return 0;
+        }
         return 1;
+    }
+
+    int number = 0;
+    if (!parse_int_strict(val, &number))
+    {
+        fprintf(stderr, "Config error: value of '%s' must be an integer, got '%s'\n", key, val);
+        return 0;
+    }
 
     if (!strcmp(key, "delay_ms"))
-        sim->delay_ms = atoi(val);
+        sim->delay_ms = number;
 
     else if (!strcmp(key, "shift_limit"))
-        sim->shift_limit = atoi(val);
+        sim->shift_limit = number;
 
     else if (!strcmp(key, "escalation_enabled"))
-        sim->escalation_enabled = atoi(val);
+        sim->escalation_enabled = number;
 
     else if (!strcmp(key, "return_to_base"))
-        sim->return_to_base = atoi(val);
+        sim->return_to_base = number;
 
-    else if (!strcmp(key, "strategy"))
-        sim->strategy = !strcasecmp(val, "FASTEST") ? STRATEGY_FASTEST : STRATEGY_NEAREST;
+    else if (!strcmp(key, "random_calls"))
+        sim->random_calls = number;
+
+    else if (!strcmp(key, "random_seed"))
+        sim->seed = (unsigned int)number;
+
+    else if (!strcmp(key, "random_interval"))
+        sim->random_interval = number;
+
+    else
+        fprintf(stderr, "Config warning: unknown setting '%s' is ignored\n", key);
 
     return 1;
 }
@@ -82,7 +142,9 @@ static int parse_district_line(Simulation *sim, const char *line)
     int each_distrct_time[MAX_DISTRICTS];
 
     int number = sscanf(line, "%31s %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d", name, &each_distrct_time[0], &each_distrct_time[1], &each_distrct_time[2], &each_distrct_time[3], &each_distrct_time[4], &each_distrct_time[5], &each_distrct_time[6], &each_distrct_time[7], &each_distrct_time[8], &each_distrct_time[9], &each_distrct_time[10], &each_distrct_time[11], &each_distrct_time[12], &each_distrct_time[13], &each_distrct_time[14], &each_distrct_time[15]);
+    
     SOFT_ASSERT(number >= 2, "invalid district line", 0);
+    SOFT_ASSERT(district_index(sim, name) < 0, "duplicate district name", 0);
 
     strcpy(distrct->name, name); // copy the district name
 
@@ -95,9 +157,12 @@ static int parse_district_line(Simulation *sim, const char *line)
     for (int idx = 0; idx < number - 1; idx++)
         distrct->travel[idx] = each_distrct_time[idx];
 
+    distrct->travel_count = number - 1;
+
     sim->district_count++;
     return 1;
 }
+
 
 /**
  * @brief Parses a team line and updates the simulation accordingly
@@ -129,7 +194,7 @@ static int parse_team_line(Simulation *sim, const char *line)
     team->district = distrct;
     team->base = distrct;
     team->state = TEAM_AVAILABLE;
-    team->call_id = -1;
+    team->call_id = NO_CALL;
 
     sim->team_count++;
     return 1;
@@ -201,7 +266,7 @@ static int parse_call_line(Simulation *sim, const char *line)
     // The call has not arrived yet
     call->state = CALL_PENDING;
 
-    call->assigned_team = 0;
+    call->assigned_team = NO_TEAM;
     call->dispatch_time = 0;
     call->service_start = 0;
     call->completion_time = 0;
@@ -284,7 +349,14 @@ int load_config(Simulation *sim, const char *path)
     }
 
     fclose(file);
-    return sim->district_count > 0 && sim->team_count > 0;
+
+    if (sim->district_count == 0 || sim->team_count == 0)
+    {
+        fprintf(stderr, "Config error: %s must contain [DISTRICTS] and [TEAMS] sections\n", path);
+        return 0;
+    }
+
+    return 1;
 }
 
 /**
@@ -321,7 +393,10 @@ int validate_simulation(const Simulation *sim)
     SOFT_ASSERT(sim, "simulation is NULL", 0);
     SOFT_ASSERT(sim->district_count > 0, "no districts configured", 0);
     SOFT_ASSERT(sim->team_count > 0, "no teams configured", 0);
-    SOFT_ASSERT(sim->shift_limit > 0, "shift limit must be positive", 0);
+    SOFT_ASSERT(sim->shift_limit >= 0, "shift limit must be non-negative (0 = unlimited)", 0);
+    SOFT_ASSERT(sim->random_calls == 0 || sim->random_calls == 1, "random_calls must be 0 or 1", 0);
+    SOFT_ASSERT(sim->random_interval > 0, "random_interval must be positive", 0);
+    SOFT_ASSERT(sim->call_count > 0 || sim->random_calls, "no calls configured and the random generator is off", 0);
     SOFT_ASSERT(sim->delay_ms >= 0, "delay must be non-negative", 0);
     SOFT_ASSERT(sim->escalation_enabled == 0 || sim->escalation_enabled == 1, "escalation_enabled must be 0 or 1", 0);
     SOFT_ASSERT(sim->return_to_base == 0 || sim->return_to_base == 1, "return_to_base must be 0 or 1", 0);
@@ -333,8 +408,17 @@ int validate_simulation(const Simulation *sim)
     {
         SOFT_ASSERT(sim->districts[idx].name[0] != '\0', "district name is empty", 0);
 
+        if (sim->districts[idx].travel_count != sim->district_count)
+        {
+            fprintf(stderr, "Config error: district %s has %d travel times, expected %d\n",
+                    sim->districts[idx].name, sim->districts[idx].travel_count, sim->district_count);
+            return 0;
+        }
+
         for (int jdx = 0; jdx < sim->district_count; jdx++)
             SOFT_ASSERT(sim->districts[idx].travel[jdx] >= -1, "invalid travel time", 0);
+
+        SOFT_ASSERT(sim->districts[idx].travel[idx] == 0, "travel time from a district to itself must be 0", 0);
     }
 
     // Validate teams
@@ -344,6 +428,7 @@ int validate_simulation(const Simulation *sim)
         SOFT_ASSERT(team->spec >= 0 && team->spec < SPEC_COUNT, "invalid team specialization", 0);
         SOFT_ASSERT(team->speed > 0, "team speed must be positive", 0);
         SOFT_ASSERT(team->district >= 0 && team->district < sim->district_count, "team district is out of range", 0);
+        SOFT_ASSERT(team->id > 0, "team id must be positive", 0);
     }
 
     // Validate calls
@@ -356,7 +441,9 @@ int validate_simulation(const Simulation *sim)
         SOFT_ASSERT(call->district >= 0 && call->district < sim->district_count, "call district is out of range", 0);
         SOFT_ASSERT(call->escalation_after >= 0, "escalation_after must be non-negative", 0);
         SOFT_ASSERT(call->cancel_after >= 0, "cancel_after must be non-negative", 0);
+        SOFT_ASSERT(call->id > 0, "call id must be positive", 0);
     }
 
     return 1;
 }
+

@@ -1,6 +1,3 @@
-/**
- * @file output.h - 1st hw
- */
 #ifndef OUTPUT_H
 #define OUTPUT_H
 #include "model.h"

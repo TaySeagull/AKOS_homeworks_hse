@@ -1,3 +1,4 @@
+# NEAREST: the same map as test_fastest, but the closest team B1 must be chosen.
 delay_ms=0
 shift_limit=50
 escalation_enabled=0
@@ -5,13 +6,13 @@ return_to_base=0
 strategy=NEAREST
 
 [DISTRICTS]
-BASE 0 10 5
-NORTH 10 0 6
-EAST 5 6 0
+BASE 0 10 2
+NORTH 10 0 8
+EAST 2 8 0
 
 [TEAMS]
 1 MEDIC 30 BASE
-2 MEDIC 60 NORTH
+2 MEDIC 240 NORTH
 
 [CALLS]
 1 0 EAST 1 1 1 MEDIC 5 20 0 0

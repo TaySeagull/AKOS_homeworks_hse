@@ -1,15 +1,20 @@
-[00:00:00] SHIFT STARTED: districts=2 teams=1 calls=2
-[00:00:00] CALL #001 ARRIVED: district=NORTH priority=1 spec=MEDIC
-[00:00:00] DISPATCH: CALL #001 priority=1 spec=MEDIC -> B1 (NEAREST), TIME=1 min
-[00:00:00] CALL #002 ARRIVED: district=NORTH priority=1 spec=MEDIC
-[00:00:01] B1 ARRIVED at NORTH for CALL #001; service started
-[00:00:03] CALL #002 CANCELLED after 3 min of waiting
-[00:00:06] CALL #001 SERVICE COMPLETED by B1; total wait=1 min
-[00:00:06] B1 RELEASED; returning to base BASE, TIME=1 min
-[00:00:07] B1 RETURNED to base BASE and is AVAILABLE
-[00:00:30] SHIFT FINISHED
+[00:00] SHIFT STARTED: districts=2 teams=1 calls=2
+[00:00] CALL #001 ARRIVED: district=NORTH (x=1, y=1) priority=1 spec=MEDIC service=5 min max_wait=20 min
+[00:00] DISPATCH: CALL #001 priority=1 spec=MEDIC waited 0 min -> B1 (NEAREST strategy)
+[00:00] B1 DEPARTED from BASE to NORTH, travel TIME=1 min
+[00:00] CALL #002 ARRIVED: district=NORTH (x=2, y=2) priority=1 spec=MEDIC service=5 min max_wait=20 min
+[00:00] SEARCH: no free MEDIC team can reach NORTH; CALL #002 is queued (waiting calls: 1)
+[00:01] B1 ARRIVED at NORTH for CALL #001 (after 1 min of waiting)
+[00:01] B1 STARTED HELP on CALL #001, it will take 5 min
+[00:03] CALL #002 CANCELLED by the caller after 3 min of waiting
+[00:06] CALL #001 HELP FINISHED by B1; total wait=1 min, service=5 min
+[00:06] B1 RELEASED; returning to base BASE, TIME=1 min
+[00:07] B1 RETURNED to base BASE and is AVAILABLE
+[00:07] ALL CALLS PROCESSED
+[00:07] SHIFT FINISHED
 
 === SHIFT SUMMARY ===
+Stop reason: all calls processed
 Calls received: 2
 Served: 1
 Cancelled: 1
@@ -18,4 +23,6 @@ Dispatches: 1
 Priority escalations: 0
 Average waiting: 1.00 min/call
 Average service: 5.00 min/call
-Simulation end: 30 min
+Simulation end: 7 min
+Processed events: 6
+Invariant violations: 0

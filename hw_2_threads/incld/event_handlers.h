@@ -1,6 +1,3 @@
-/**
- * @file event_handlers.h - 1st hw
- */
 #ifndef EVENT_HANDLERS_H
 #define EVENT_HANDLERS_H
 
