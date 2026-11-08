@@ -1,9 +1,13 @@
-[00:00:00] SHIFT STARTED: districts=2 teams=1 calls=1
-[00:00:00] CALL #001 ARRIVED: district=NORTH priority=1 spec=MEDIC
-[00:00:00] DISPATCH: CALL #001 priority=1 spec=MEDIC -> B1 (NEAREST), TIME=10 min
-[00:00:05] SHIFT FINISHED
+[00:00] SHIFT STARTED: districts=2 teams=1 calls=1
+[00:00] CALL #001 ARRIVED: district=NORTH (x=1, y=1) priority=1 spec=MEDIC service=20 min max_wait=30 min
+[00:00] DISPATCH: CALL #001 priority=1 spec=MEDIC waited 0 min -> B1 (NEAREST strategy)
+[00:00] B1 DEPARTED from BASE to NORTH, travel TIME=10 min
+[00:05] SHIFT LIMIT 5 min REACHED
+[00:05] CALL #001 UNSERVED: the shift is over (state EN_ROUTE, team B1)
+[00:05] SHIFT FINISHED
 
 === SHIFT SUMMARY ===
+Stop reason: shift limit reached
 Calls received: 1
 Served: 0
 Cancelled: 0
@@ -13,3 +17,5 @@ Priority escalations: 0
 Average waiting: 0.00 min/call
 Average service: 0.00 min/call
 Simulation end: 5 min
+Processed events: 1
+Invariant violations: 0

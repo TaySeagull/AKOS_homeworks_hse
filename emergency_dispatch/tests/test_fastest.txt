@@ -1,3 +1,4 @@
+# FASTEST: B1 is closer (2) but slow, B2 is farther (8) but very fast (speed 240 -> 1 min).
 delay_ms=0
 shift_limit=50
 escalation_enabled=0
@@ -11,7 +12,7 @@ EAST 2 8 0
 
 [TEAMS]
 1 MEDIC 30 BASE
-2 MEDIC 60 NORTH
+2 MEDIC 240 NORTH
 
 [CALLS]
 1 0 EAST 1 1 1 MEDIC 5 20 0 0

@@ -30,7 +30,7 @@ int push_event(Simulation *sim, int time, EventType type, int id)
 {
     SOFT_ASSERT(sim, "simulation is NULL", 0);
     SOFT_ASSERT(time >= 0, "event time must be non-negative", 0);
-    SOFT_ASSERT(type >= EV_CALL_ARRIVAL && type <= EV_CANCEL, "invalid event type", 0);
+    SOFT_ASSERT(type >= EV_CALL_ARRIVAL && type <= EV_WAIT_TIMEOUT, "invalid event type", 0);
     SOFT_ASSERT(sim->event_count < MAX_EVENTS, "event queue is full", 0);
 
     Event event = {time, type, id, sim->next_seq++};
@@ -102,4 +102,101 @@ Event pop_event(Simulation *sim)
     }
 
     return top_event;
+}
+
+/**
+ * @brief Restores the heap property for the subtree rooted at index
+ * @param sim Pointer to the simulation structure
+ * @param idx Index of the root of the subtree
+ */
+static void sift_down(Simulation *sim, int idx)
+{
+    for (;;)
+    {
+        int left = idx * 2 + 1;
+        int right = left + 1;
+        int best = idx;
+
+        if (left < sim->event_count && event_less(&sim->events[left], &sim->events[best]))
+            best = left;
+
+        if (right < sim->event_count && event_less(&sim->events[right], &sim->events[best]))
+            best = right;
+
+        if (best == idx)
+            return;
+
+        Event temp = sim->events[idx];
+        sim->events[idx] = sim->events[best];
+        sim->events[best] = temp;
+
+        idx = best;
+    }
+}
+
+/**
+ * @brief Removes the personal deadlines (escalation, cancellation, max_wait)
+ * of a call from the queue
+ * @param call_id Id of the call
+ * @return Number of removed events
+ */
+int remove_call_deadlines(Simulation *sim, int call_id)
+{
+    SOFT_ASSERT(sim, "simulation is NULL", 0);
+
+    int kept = 0;
+    int removed = 0;
+
+    for (int idx = 0; idx < sim->event_count; idx++)
+    {
+        const Event *event = &sim->events[idx];
+        int deadline = event->type == EV_ESCALATION || event->type == EV_CANCEL || event->type == EV_WAIT_TIMEOUT;
+
+        if (deadline && event->id == call_id)
+        {
+            removed++;
+            continue;
+        }
+
+        sim->events[kept++] = *event;
+    }
+
+    sim->event_count = kept;
+
+    // rebuild the binary heap (Floyd's algorithm)
+    for (int idx = sim->event_count / 2 - 1; idx >= 0; idx--)
+        sift_down(sim, idx);
+
+    return removed;
+}
+
+/**
+ * @brief Removes all future call arrivals from the queue (intake is closed)
+ * @param sim Pointer to the simulation structure
+ * @return Number of removed arrivals
+ */
+int remove_call_arrivals(Simulation *sim)
+{
+    SOFT_ASSERT(sim, "simulation is NULL", 0);
+
+    int kept = 0;
+    int removed = 0;
+
+    for (int idx = 0; idx < sim->event_count; idx++)
+    {
+        if (sim->events[idx].type == EV_CALL_ARRIVAL)
+        {
+            removed++;
+            continue;
+        }
+
+        sim->events[kept++] = sim->events[idx];
+    }
+
+    sim->event_count = kept;
+
+    for (int idx = sim->event_count / 2 - 1; idx >= 0; idx--)
+        sift_down(sim, idx);
+
+    return removed;
 }

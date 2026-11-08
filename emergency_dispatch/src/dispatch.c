@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "utils_extra.h"
 #include "simulation.h"
+#include "event_queue.h"
 #include <limits.h>
 
 #define BASE_SPEED 30.0
@@ -127,7 +128,8 @@ int try_dispatch(Simulation *sim)
 
             int wait = sim->now - call->arrival;
 
-            // Select the call with the highest priority and longest waiting time
+            // Select the call with the highest priority (1 is the most urgent)
+            // and, for equal priorities, the one that has been waiting longest
             if (call->priority < priority || (call->priority == priority && wait > wait_best))
             {
                 selected = idx;
@@ -149,15 +151,22 @@ int try_dispatch(Simulation *sim)
         int time = travel_time(sim, team, call_->district);
         SOFT_ASSERT(time >= 0, "team cannot reach call district", 0);
 
+        int from = team->district;
+
         call_->assigned_team = team->id;
         call_->dispatch_time = sim->now;
         call_->state = CALL_EN_ROUTE;
         team->state = TEAM_EN_ROUTE;
         team->call_id = call_->id;
 
+        remove_call_deadlines(sim, call_->id); // the call does not wait any more
+
         sim->dispatches++;
 
-        log_event(sim, "DISPATCH: CALL #%03d priority=%d spec=%s -> B%d (%s), TIME=%d min", call_->id, call_->priority, spec_name(call_->spec), team->id, strategy_name(sim->strategy), time);
+        log_event(sim, "DISPATCH: CALL #%03d priority=%d spec=%s waited %d min -> B%d (%s strategy)", call_->id,
+                  call_->priority, spec_name(call_->spec), sim->now - call_->arrival, team->id, strategy_name(sim->strategy));
+        log_event(sim, "B%d DEPARTED from %s to %s, travel TIME=%d min", team->id, sim->districts[from].name,
+                  sim->districts[call_->district].name, time);
 
         if (!schedule_event_checked(sim, sim->now + time, EV_TEAM_ARRIVAL, team->id))
             return 0;

@@ -1,5 +1,7 @@
+# Escalation: call 2 (priority 3) waits while B1 is busy with call 1.
+# Its priority must rise 3 -> 2 at minute 4 and 2 -> 1 at minute 7.
 delay_ms=0
-shift_limit=40
+shift_limit=60
 escalation_enabled=1
 return_to_base=1
 strategy=NEAREST
@@ -12,5 +14,6 @@ NORTH 1 0
 1 MEDIC 30 BASE
 
 [CALLS]
+# id arrival district x y priority spec service max_wait escalation cancel
 1 0 NORTH 1 1 1 MEDIC 15 30 3 0
-2 1 NORTH 2 2 3 MEDIC 5 30 0 0
+2 1 NORTH 2 2 3 MEDIC 5 30 3 0

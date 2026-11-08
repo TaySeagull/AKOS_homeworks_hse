@@ -8,6 +8,8 @@
 #define MAX_EVENTS 1024  // the max number of events in the simulation
 #define NAME_LEN 32      // the max length of names for districts, teams, and specializations
 #define LINE_LEN 256     // the max length of a line in the configuration file
+#define NO_CALL (-1)     // value of Team.call_id when the team serves nothing
+#define NO_TEAM (-1)     // value of Call.assigned_team when no team is assigned
 
 /**
  * @enum Specialization
@@ -74,8 +76,22 @@ typedef enum
     EV_TEAM_ARRIVAL,
     EV_SERVICE_DONE,
     EV_RETURN_DONE,
-    EV_CANCEL
+    EV_CANCEL,
+    EV_WAIT_TIMEOUT // the call reached its max_wait. Added in ver 2.
 } EventType;
+
+/**
+ * @enum StopReason
+ * @brief Why the simulation loop has stopped
+ */
+typedef enum
+{
+    STOP_ALL_PROCESSED = 0, // the event queue became empty
+    STOP_SHIFT_LIMIT,       // the next event is after the end of the shift
+    STOP_INTERRUPTED,       // SIGINT / SIGTERM from the user
+    STOP_INTAKE_CLOSED      // SIGQUIT: no new calls, active calls were finished
+} StopReason;
+
 
 /**
  * @struct District
@@ -85,7 +101,9 @@ typedef struct
 {
     char name[NAME_LEN];
     int travel[MAX_DISTRICTS];
+    int travel_count; // how many travel values were given in the configuration line
 } District;
+
 
 /**
  * @struct Team
@@ -172,8 +190,21 @@ typedef struct
     int escalations;
     int dispatches;
     int completed_events;
-    FILE *log;
+    int received;          // calls that really arrived
+    int invariant_errors;  // number of detected invariant violations
+    StopReason stop_reason; // stop reason for the simulation loop
+  
+    int random_calls;      // 1 = generate calls randomly 
+    unsigned int seed;     // seed of the generator, gives a reproducible run
+    unsigned int rng;      // current state of rand_r()
+    int random_interval;   // mean interval between generated calls, minutes
+    int next_call_id;      // id of the next generated call
+
+    int intake_closed;     // 1 after SIGQUIT: new calls are not accepted any more
+
+    int log_fd;            // descriptor of the log file
 
 } Simulation;
 
 #endif
+

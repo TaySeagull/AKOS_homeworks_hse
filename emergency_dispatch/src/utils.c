@@ -5,6 +5,8 @@
 #include <string.h>
 #include <strings.h>
 #include <time.h>
+#include <errno.h>
+#include <unistd.h>
 
 /**
  * @brief Returns the name of a specialization
@@ -151,7 +153,64 @@ int find_team_index_by_id(const Simulation *sim, int id)
 }
 
 /**
- * @brief Logs an event to the simulation output
+ * @brief Writes the whole buffer to a file descriptor
+ * @param fd File descriptor
+ * @param buf Data to write
+ * @param len Number of bytes
+ * @return 1 on success, 0 on failure
+ */
+int write_all(int fd, const char *buf, size_t len)
+{
+    SOFT_ASSERT(buf, "buffer is NULL", 0);
+
+    while (len > 0)
+    {
+        ssize_t written = write(fd, buf, len);
+
+        if (written < 0)
+        {
+            if (errno == EINTR) // interrupted by SIGINT before anything was written
+                continue;
+            return 0;
+        }
+
+        buf += written;
+        len -= (size_t)written;
+    }
+
+    return 1;
+}
+
+/**
+ * @brief printf-like output to a file descriptor (vsnprintf + write(2))
+ * @param fd File descriptor (STDOUT_FILENO, log descriptor, ...)
+ * @param fmt Format string
+ * @return 1 on success, 0 on failure
+ */
+int fd_printf(int fd, const char *fmt, ...)
+{
+    SOFT_ASSERT(fmt, "format is NULL", 0);
+
+    if (fd < 0)
+        return 1; // nothing to write to (log is disabled)
+
+    char buffer[OUT_BUF_LEN];
+
+    va_list ap;
+    va_start(ap, fmt);
+    int len = vsnprintf(buffer, sizeof(buffer), fmt, ap);
+    va_end(ap);
+
+    SOFT_ASSERT(len >= 0, "formatting error", 0);
+
+    if ((size_t)len >= sizeof(buffer)) // the line was truncated
+        len = (int)sizeof(buffer) - 1;
+
+    return write_all(fd, buffer, (size_t)len);
+}
+
+/**
+ * @brief Logs an event to the console and to the log file
  * @param sim Pointer to the simulation structure
  * @param fmt The format string for the log message
  * @param ... The arguments for the format string
@@ -162,31 +221,27 @@ int log_event(Simulation *sim, const char *fmt, ...)
     SOFT_ASSERT(sim, "simulation is NULL", 0);
     SOFT_ASSERT(fmt, "log format is NULL", 0);
 
+    char message[OUT_BUF_LEN];
+
     va_list ap;        // Variable argument list
     va_start(ap, fmt); // Initialize the variable argument list
+    vsnprintf(message, sizeof(message), fmt, ap);
+    va_end(ap);
 
-    // current time of the simulation
-    printf("\n[%02d:%02d:%02d] ", sim->now / 3600, (sim->now / 60) % 60, sim->now % 60);
-    
-    vprintf(fmt, ap);
-    printf("\n");
+    // model time is in minutes: hours = now / 60, minutes = now % 60
+    char line[OUT_BUF_LEN + 32];
+    int len = snprintf(line, sizeof(line), "[%02d:%02d] %s\n", sim->now / 60, sim->now % 60, message);
 
-    if (sim->log)
-    {
-        va_end(ap); // start again
+    if (len < 0)
+        return 0;
 
-        va_start(ap, fmt);
-        fprintf(sim->log, "[%02d:%02d:%02d] ", sim->now / 3600, (sim->now / 60) % 60, sim->now % 60);
-        vfprintf(sim->log, fmt, ap);
-        fprintf(sim->log, "\n");
-    }
+    if ((size_t)len >= sizeof(line))
+        len = (int)sizeof(line) - 1;
 
-    va_end(ap); // real end
+    write_all(STDOUT_FILENO, line, (size_t)len);
 
-    fflush(stdout); // immediate output to console
-
-    if (sim->log)
-        fflush(sim->log); // immediate output to log file
+    if (sim->log_fd >= 0)
+        write_all(sim->log_fd, line, (size_t)len);
 
     return 1;
 }
