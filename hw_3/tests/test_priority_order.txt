@@ -1,0 +1,19 @@
+# Priority order: while B1 is busy, call 2 (priority 3, arrived first) and
+# call 3 (priority 1, arrived later) wait. Call 3 must be served first.
+delay_ms=0
+shift_limit=100
+escalation_enabled=0
+return_to_base=0
+strategy=NEAREST
+
+[DISTRICTS]
+BASE 0 1
+NORTH 1 0
+
+[TEAMS]
+1 MEDIC 30 BASE
+
+[CALLS]
+1 0 NORTH 1 1 2 MEDIC 10 40 0 0
+2 1 NORTH 2 2 3 MEDIC 5 40 0 0
+3 2 NORTH 3 3 1 MEDIC 5 40 0 0

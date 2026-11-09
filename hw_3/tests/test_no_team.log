@@ -1,0 +1,21 @@
+[00:00] {CLK } SHIFT STARTED: districts=2 teams=1 calls=1; threads: clock, dispatcher, signals, 1 teams, 1 calls
+[00:00] {C001} CALL #001 ARRIVED: district=NORTH (x=1, y=1) priority=1 spec=FIRE service=5 min max_wait=10 min
+[00:00] {DSP } SEARCH: no free FIRE team can reach NORTH; CALL #001 is queued (waiting calls: 1)
+[00:10] {C001} CALL #001 UNSERVED: maximum waiting time 10 min exceeded
+[00:10] {CLK } ALL CALLS PROCESSED
+[00:10] {CLK } SHIFT FINISHED
+
+=== SHIFT SUMMARY ===
+Stop reason: all calls processed
+Calls received: 1
+Served: 0
+Cancelled: 0
+Unserved: 1
+Dispatches: 0
+Priority escalations: 0
+Average waiting: 0.00 min/call
+Average service: 0.00 min/call
+Simulation end: 10 min
+Processed events: 2
+Invariant violations: 0
+Threads created: 4 (mutex + condition variables)
