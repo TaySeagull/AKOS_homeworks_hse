@@ -29,13 +29,17 @@ int log_event(Simulation *sim, const char *format, ...) __attribute__((format(pr
 
 int sleep_visual(const Simulation *sim);
 
-// Sets the identification tag of the current thread for log messages
-void set_thread_tag(const char *tag);
+// Sets the identification tag of the current process for log messages
+void set_process_tag(const char *tag);
 
-// Locks the output mutex to prevent concurrent output from multiple threads
+// Descriptor of the log file of the current process
+void set_log_fd(int fd);
+int get_log_fd(void);
+
+// Locks the output semaphore to prevent mixed output of several processes
 void output_begin(Simulation *sim);
 
-// Unlocks the output mutex after the output operation is completed
+// Unlocks the output semaphore after the output operation is completed
 void output_end(Simulation *sim);
 
 #endif

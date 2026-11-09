@@ -1,26 +1,28 @@
-**# Emergency Dispatch Simulator with threads**
+**# Emergency Dispatch Simulator with processes**
 
-Homework 2 for AKOS, variant 35
+Homework 3 for AKOS, variant 35
 
-A multithreaded discrete-event simulation of an emergency dispatch service, implemented in C.
+A discrete-event simulation of an emergency dispatch service, implemented in C using processes and POSIX IPC.
 
 The program simulates call intake, the dispatch of specialized teams, team movement between districts, call servicing, priority escalation, cancellation by the caller, unserved calls due to maximum waiting time, the shift limit and the return of teams to base.
 
-Each entity with independent behaviour is represented by a separate thread: the clock, dispatcher, teams, calls and signal handler.
+Each entity with independent behaviour is represented by a separate process: the clock, dispatcher, teams and calls.
 
-Threads communicate through messages using bounded mailboxes. Access to shared simulation data is protected by a mutex.
+Four implementations are available:
 
-Two synchronization implementations are available:
-- `emergency_dispatch` — mutexes and POSIX semaphores
-- `emergency_dispatch_cv` — mutexes and condition variables
+- `ed_fork_named` — parent process creates child processes using `fork()`, with named POSIX semaphores and shared memory
+- `ed_fork_unnamed` — parent process creates child processes using `fork()`, with unnamed POSIX semaphores and shared memory
+- `ed_shm_*` — independent programs communicating through POSIX shared memory and named semaphores
+- `ed_mq_*` — independent programs communicating through POSIX message queues and named semaphores
 
-Model time is measured in minutes from the start of the shift. Every log line has a timestamp in the `[HH:MM]` format and identifies the thread that produced it.
+All implementations use the same simulation logic. Only the IPC and synchronization layers differ.
 
+Model time is measured in minutes from the start of the shift. Every log line has a timestamp in the `[HH:MM]` format and identifies the process that produced it.
 
 **## Project structure**
 
 ```text
-hw_2_threads/
+hw_3_processes/
 ├── incld/
 │   ├── config.h
 │   ├── dispatch.h
@@ -29,29 +31,31 @@ hw_2_threads/
 │   ├── model.h
 │   ├── output.h
 │   ├── simulation.h
-│   ├── sync.h
-│   ├── threads.h
-│   ├── threads_internal.h
 │   ├── utils.h
-│   └── utils_extra.h
+│   ├── utils_extra.h
+│   ├── message.h
+│   ├── ipc.h
+│   ├── sems.h
+│   ├── roles.h
+│   └── signals.h
 │
 ├── src/
-│   ├── threads/
-│   │    ├── call_thread.c
-│   │    ├── dispatcher_thread.c
-│   │    ├── signal_thread.c
-│   │    └── team_thread.c
-│   ├── main.c
+│   ├── main_server.c
+│   ├── main_client.c
 │   ├── config.c
 │   ├── dispatch.c
 │   ├── event_queue.c
 │   ├── generator.c
 │   ├── output.c
 │   ├── simulation.c
-│   ├── threads.c
-│   ├── sync_sem.c
-│   ├── sync_cv.c
-│   └── utils.c
+│   ├── roles.c
+│   ├── signals.c
+│   ├── utils.c
+│   ├── ipc_shm.c
+│   ├── ipc_mq.c
+│   ├── sem_common.c
+│   ├── sem_named.c
+│   └── sem_unnamed.c
 │
 ├── tests/
 │   ├── test_*.txt
@@ -61,27 +65,39 @@ hw_2_threads/
 │
 ├── config.txt
 ├── run_tests.sh
+├── run_independent.sh
+├── ipc_cleanup.sh
 ├── Makefile
 └── README.md
 ```
 
 **## Command Line Interface**
 
-**#### Arguments**
+**#### Clock / Fork programs**
 
 `-c <file>`             configuration file
 
 `-d <milliseconds>`     visual delay after every model minute with events (0 = no delay)
 
-`-s <strategy>`         strategy of choosing a brigade
+`-s <strategy>`         strategy of choosing a team
 
-`-l <file>`             log journal
+`-l <file>`             log file
 
 `-t <minutes>`          shift length (0 = unlimited)
 
 `-r <seed>`             enable random call generation with the specified seed
 
+`-n <name>`             IPC session name
+
 `-h`                    help
+
+**#### Independent clients**
+
+`-n <name>`             IPC session name (must match the clock)
+
+`-i <id>`               team ID (team program only; default: first available team)
+
+`-w <seconds>`          how long to wait for the clock (default: 30)
 
 **#### Strategy**
 
@@ -114,37 +130,53 @@ random_interval=10
 # service time, max wait, escalation, cancellation
 ```
 
-**## Multithreading**
+**## Processes**
 
-Every entity with independent behaviour runs in its own thread:
+Every entity with independent behaviour runs in its own process:
 
-- Clock — owns model time and the event queue, wakes threads when their events occur
-- Dispatcher — receives reports and assigns available teams to calls
+- Clock — owns model time and the event queue, wakes processes when their events occur, checks simulation invariants and prints the final summary
+- Dispatcher — receives reports and assigns available teams to waiting calls
 - Team — travels to calls, provides service, returns to base and schedules its next events
 - Call — waits for a team, escalates priority, cancels or gives up after the maximum waiting time
-- Signal thread — handles incoming signals using `sigwait()`
 
-Threads communicate only through messages. Each thread has a bounded mailbox, implemented as a producer-consumer buffer.
+In the fork versions, the clock is the parent process and creates child processes for the dispatcher, teams and calls.
 
-The `world` mutex protects shared simulation data.
+In the independent versions, each role is implemented as a separate executable. The dispatcher, team and callers programs register with the clock when they start.
 
-**## Synchronization**
+The signal thread from homework 2 is replaced by signal handlers using `sigaction()` in the clock process.
 
-Two versions of the program use the same simulation logic but different synchronization mechanisms.
+**## Interprocess Communication**
 
-`emergency_dispatch`
+Four implementations use the same simulation logic but different IPC mechanisms.
 
-- Mutexes
-- POSIX semaphores
-- Semaphore-based mailbox and quiet counter (`sync_sem.c`)
+`ed_fork_named`
 
-`emergency_dispatch_cv`
+- POSIX shared memory (`shm_open()` and `mmap()`)
+- Named POSIX semaphores (`sem_open()`)
+- Parent process creates child processes using `fork()`
 
-- Mutexes
-- Condition variables
-- Condition-variable-based mailbox and quiet counter (`sync_cv.c`)
+`ed_fork_unnamed`
 
-The quiet counter tracks unhandled messages. The clock waits until all messages have been processed before starting the next dispatching round.
+- POSIX shared memory
+- Unnamed POSIX semaphores (`sem_init()` with `pshared = 1`)
+- Parent process creates child processes using `fork()`
+
+`ed_shm_*`
+
+- POSIX shared memory
+- Named POSIX semaphores
+- Independent programs for the clock, dispatcher, teams and callers
+
+`ed_mq_*`
+
+- POSIX message queues (`mq_open()`)
+- Named POSIX semaphores
+- Independent programs for the clock, dispatcher, teams and callers
+- No shared memory
+
+Processes communicate through messages. In the shared-memory versions, messages are exchanged through bounded mailboxes protected by semaphores.
+
+In the message-queue version, every process maintains its own copy of the simulation model. Changes to calls and teams are sent using `MSG_SYNC` messages. The clock owns the event queue, and other processes request event scheduling through messages.
 
 **## One Step of the Clock**
 
@@ -153,16 +185,37 @@ The quiet counter tracks unhandled messages. The clock waits until all messages 
 3. When all messages have been processed, the dispatcher receives `MSG_ROUND` and assigns available teams.
 4. The clock waits for the dispatching round to finish, checks simulation invariants and advances model time.
 
-Inside a minute, threads work asynchronously. The model time remains consistent, and the simulation results are independent of the order in which the operating system schedules threads.
+The quiet counter tracks unhandled messages. The clock starts the next minute only after all reactions from the current minute have been completed.
+
+In the shared-memory versions, the counter is stored in shared memory and protected by semaphores.
+
+In the message-queue version, the clock counts sent messages and receives `MSG_DONE` responses when they have been handled.
+
+**## Semaphores**
+
+The following semaphores are used for synchronization:
+
+- `world` — protects access to the shared simulation model
+- `output` — prevents processes from printing simultaneously
+- `quiet_lock`, `quiet_idle` — synchronize the quiet counter
+- `box_*_lock`, `box_*_filled`, `box_*_free` — implement producer-consumer mailboxes in shared memory
+- `sent` — tracks sent messages in the message-queue version
+- `ready`, `exited` — synchronize registration and termination of independent clients
+- `claim_dispatcher`, `claim_callers`, `claim_team<k>` — prevent multiple processes from taking the same role
 
 **## Signals**
 
+`SIGINT` (Ctrl+C), `SIGTERM` — stop the simulation; active calls are recorded as unserved;
 
-`SIGINT` (Ctrl+C), `SIGTERM` - Stop the simulation; active calls are recorded as unserved;
-`SIGQUIT` (Ctrl+\\) - Close call intake; finish active calls and then stop;
-`SIGUSR1` - Print the current simulation status.
+`SIGQUIT` (Ctrl+\\) — close call intake; finish active calls and then stop;
 
-Signals are blocked in the main thread and handled by a separate signal thread using `sigwait()`.
+`SIGUSR1` — print the current simulation status.
+
+Signals are handled by the clock process using `sigaction()`.
+
+Forked child processes ignore `SIGINT` and `SIGQUIT` and forward `SIGTERM` and `SIGUSR1` to the clock.
+
+Independent clients forward signals to the clock, so a signal received by any client can stop or control the whole simulation.
 
 **## Termination**
 
@@ -170,8 +223,15 @@ Signals are blocked in the main thread and handled by a separate signal thread u
 - The shift limit is reached. Active calls are recorded as unserved.
 - `SIGINT` or `SIGTERM` is received. Active calls are recorded as unserved and the summary is printed.
 - `SIGQUIT` is received. No new calls are accepted; active calls are finished before termination.
+- A simulation process terminates unexpectedly. The clock detects the failure and stops the simulation with exit code 2.
 
-With `-t 0` and random call generation enabled, the simulation runs without a shift limit and can be stopped using Ctrl+C or Ctrl+\\.
+In every case, the clock sends `MSG_SHUTDOWN` to the other processes, waits for their termination, prints the summary and removes IPC resources.
+
+Exit codes:
+
+- `0` — normal termination
+- `1` — configuration, argument or IPC error
+- `2` — unexpected process termination
 
 **## Build and Launch**
 
@@ -185,15 +245,30 @@ With `-t 0` and random call generation enabled, the simulation runs without a sh
 
 3. Launch
 
-       ./emergency_dispatch
-       ./emergency_dispatch -c config.txt
-       ./emergency_dispatch -c config.txt -d 0
-       ./emergency_dispatch -c config.txt -s fastest
-       ./emergency_dispatch -l dispatch.log
-       ./emergency_dispatch -c tests/test_stress.txt -d 100
-       ./emergency_dispatch -c config.txt -t 0 -r 42
-       ./emergency_dispatch_cv -c config.txt -d 0
+**Fork versions (4–6 points)**
+
+       ./bin/ed_fork_named -c config.txt
+       ./bin/ed_fork_unnamed -c config.txt
+
+**Independent programs with shared memory (7–8 points)**
+
+       ./run_independent.sh shm -c config.txt
+
+**Independent programs with message queues (9–10 points)**
+
+       ./run_independent.sh mq -c config.txt
+       ./run_independent.sh mq -c tests/test_stress.txt -d 50
 
 4. Tests
 
        make test
+
+5. IPC cleanup
+
+       make ipc-clean
+
+`make ipc-clean` removes IPC objects left after an abnormal termination, for example after `kill -9`.
+
+6. Remove build files
+
+       make clean

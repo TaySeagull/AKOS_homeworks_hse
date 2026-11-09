@@ -1,8 +1,7 @@
 #ifndef MODEL_H
 #define MODEL_H
 #include <stdio.h>
-#include <pthread.h>
-#include "sync.h"
+#include <sys/types.h>
 
 #define MAX_DISTRICTS 16 // the max number of districts in the simulation
 #define MAX_TEAMS 32     // the max number of teams in the simulation
@@ -91,7 +90,8 @@ typedef enum
     STOP_ALL_PROCESSED = 0, // the event queue became empty
     STOP_SHIFT_LIMIT,       // the next event is after the end of the shift
     STOP_INTERRUPTED,       // SIGINT / SIGTERM from the user
-    STOP_INTAKE_CLOSED      // SIGQUIT: no new calls, active calls were finished
+    STOP_INTAKE_CLOSED,     // SIGQUIT
+    STOP_PROCESS_FAILURE    // a process of the simulation died unexpectedly
 } StopReason;
 
 /**
@@ -119,10 +119,9 @@ typedef struct
     TeamState state;
     int call_id;
 
-    //thread of the team
-    pthread_t thread;
-    Mailbox mailbox; // commands from the dispatcher and wake-ups from the clock
-    int started;     // 1 if the thread was created
+    // process of the team
+    pid_t pid;   // pid of the process that plays this team
+    int started; // 1 if the process is running and registered
 
 } Team;
 
@@ -148,10 +147,9 @@ typedef struct
     int service_start;
     int completion_time;
 
-    // thread of the call
-    pthread_t thread;
-    Mailbox mailbox; // wake-ups from the clock and the message of the team
-    int started;     // 1 if the thread was created
+    // process of the call
+    pid_t pid;   // pid of the process that plays this call
+    int started; // 1 if the process that plays the call is running
 
 } Call;
 
@@ -200,11 +198,11 @@ typedef struct
     int escalations;
     int dispatches;
     int completed_events;
-    int received;          // calls that really arrived (EV_CALL_ARRIVAL processed)
+    int received;          // calls that really arrived
     int invariant_errors;  // number of detected invariant violations (must stay 0)
     StopReason stop_reason;
 
-    // random call generator (used together with unlimited shift or as extra load)
+    // random call generator
     int random_calls;      // 1 = generate calls randomly instead of / in addition to [CALLS]
     unsigned int seed;     // seed of the generator, gives a reproducible run
     unsigned int rng;      // current state of rand_r()
@@ -213,22 +211,12 @@ typedef struct
 
     int intake_closed;     // 1 after SIGQUIT: new calls are not accepted any more
 
-    int log_fd;            // descriptor of the log file (-1 = no log), written with write(2)
-
-    // multithread
-    pthread_mutex_t world;       // protects the whole model: teams, calls, event queue, statistics
-    pthread_mutex_t output_lock; // one output line (or box) is printed by one thread at a time
-    pthread_mutex_t control;     // protects the flags below, they are set by the signal thread
-    int stop_requested;          // SIGINT / SIGTERM
-    int close_requested;         // SIGQUIT
-    int snapshot_requested;      // SIGUSR1
-    int shutting_down;           // the signal thread must finish
-
-    Quiet quiet;                 // counter of not yet handled messages
-    Mailbox dispatcher_box;      // mailbox of the dispatcher thread
-    pthread_t dispatcher;
-    pthread_t signal_thread;
-    int threads_started;         // number of created threads (for the summary)
+    // processes
+    pid_t clock_pid;        // pid of the clock process, clients forward signals to it
+    pid_t dispatcher_pid;   // pid of the dispatcher process
+    pid_t callers_pid;      // pid of the "callers" family process
+    int processes_started;  // number of started/registered processes
+    char log_path[LINE_LEN];// log file, opened by every process with O_APPEND
 
 } Simulation;
 

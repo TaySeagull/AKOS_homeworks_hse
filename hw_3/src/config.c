@@ -27,7 +27,6 @@ int set_defaults(Simulation *sim)
     sim->escalation_enabled = 1; // enable escalation
     sim->return_to_base = 1;     // return to base after service
     sim->strategy = STRATEGY_NEAREST;
-    sim->log_fd = -1;            // log is opened later in main()
     sim->stop_reason = STOP_ALL_PROCESSED;
     sim->random_calls = 0;       // calls are taken from [CALLS] only
     sim->seed = 1;

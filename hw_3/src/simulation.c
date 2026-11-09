@@ -3,15 +3,22 @@
 #include "event_queue.h"
 #include "generator.h"
 #include "output.h"
-#include "threads.h"
+#include "ipc.h"
+#include "signals.h"
 #include "utils.h"
 #include "utils_extra.h"
+#include <signal.h>
 #include <string.h>
 
 #define SNAPSHOT_EVERY_STEPS 4
 
 /**
  * @brief Schedules a simulation event with bounds checking (world mutex must be locked)
+ * @param sim Pointer to the simulation structure
+ * @param time The time of the event
+ * @param type The type of the event
+ * @param id The ID of the event
+ * @return 1 on success, 0 on failure
  */
 int schedule_event_checked(Simulation *sim, int time, EventType type, int id)
 {
@@ -24,6 +31,8 @@ int schedule_event_checked(Simulation *sim, int time, EventType type, int id)
 
 /**
  * @brief Puts the arrivals of all configured calls into the queue
+ * @param sim Pointer to the simulation structure
+ * @return 1 on success, 0 on failure
  */
 int seed_events(Simulation *sim)
 {
@@ -51,6 +60,7 @@ int seed_events(Simulation *sim)
 
 /**
  * @brief Checks the model invariants from the task statement (world mutex must be locked)
+ * @param sim Pointer to the simulation structure
  * @return 1 if all invariants hold, 0 otherwise
  */
 int check_invariants(Simulation *sim)
@@ -119,6 +129,8 @@ int check_invariants(Simulation *sim)
 
 /**
  * @brief Fixes all calls that are still active when the simulation stops (world mutex locked)
+ * @param sim Pointer to the simulation structure
+ * @param reason The reason for marking the calls as unserved
  */
 static void mark_active_calls_unserved(Simulation *sim, const char *reason)
 {
@@ -140,20 +152,8 @@ static void mark_active_calls_unserved(Simulation *sim, const char *reason)
 }
 
 /**
- * @brief Reads (and resets) the requests of the signal thread
- */
-static void read_control(Simulation *sim, int *stop, int *close, int *snapshot)
-{
-    pthread_mutex_lock(&sim->control);
-    *stop = sim->stop_requested;
-    *close = sim->close_requested;
-    *snapshot = sim->snapshot_requested;
-    sim->snapshot_requested = 0;
-    pthread_mutex_unlock(&sim->control);
-}
-
-/**
  * @brief Prints the live status box as one block (world mutex locked)
+ * @param sim Pointer to the simulation structure
  */
 static void snapshot_locked(Simulation *sim)
 {
@@ -163,7 +163,8 @@ static void snapshot_locked(Simulation *sim)
 }
 
 /**
- * @brief Creates a random call and starts its thread (world mutex locked)
+ * @brief Creates a random call and starts its process (world lock is held)
+ * @param sim Pointer to the simulation structure
  * @return Id of the new call, or -1 if it could not be created
  */
 static int spawn_random_call(Simulation *sim)
@@ -175,12 +176,12 @@ static int spawn_random_call(Simulation *sim)
     if (idx < 0)
         return -1;
 
-    if (!start_call_thread(sim, idx))
+    if (!ipc_start_call(sim, idx))
     {
         sim->calls[idx].state = CALL_UNSERVED;
         sim->received++;
         sim->unserved++;
-        log_event(sim, "CALL #%03d REJECTED: no thread could be created, recorded as unserved", sim->calls[idx].id);
+        log_event(sim, "CALL #%03d REJECTED: no process could be created, recorded as unserved", sim->calls[idx].id);
         return -1;
     }
 
@@ -188,34 +189,36 @@ static int spawn_random_call(Simulation *sim)
 }
 
 /**
- * @brief Delivers one event to the thread that owns it (no mutex held)
+ * @brief Delivers one event to the process that owns it (world lock is not held)
+ * @param sim Pointer to the simulation structure
+ * @param event Pointer to the event to be delivered
  * @return 1 if a message was sent
  */
 static int deliver(Simulation *sim, const Event *event)
 {
     if (event->type == EV_TEAM_ARRIVAL || event->type == EV_SERVICE_DONE || event->type == EV_RETURN_DONE)
     {
-        pthread_mutex_lock(&sim->world);
+        world_lock(sim);
         int idx = find_team_index_by_id(sim, event->id);
-        pthread_mutex_unlock(&sim->world);
+        world_unlock(sim);
 
         if (idx < 0)
             return 0;
 
-        send_message(sim, &sim->teams[idx].mailbox, MSG_WAKE, event->type, idx);
+        ipc_send_simple(sim, BOX_TEAM, idx, MSG_WAKE, event->type, idx, 0);
         return 1;
     }
 
-    // events of a call; a closed call ignores it, but its thread still reads the box
-    pthread_mutex_lock(&sim->world);
+    // events of a call; a closed call ignores it, but its process still reads the box
+    world_lock(sim);
     int idx = find_call_index_by_id(sim, event->id);
     int alive = idx >= 0 && sim->calls[idx].started;
-    pthread_mutex_unlock(&sim->world);
+    world_unlock(sim);
 
     if (!alive)
         return 0;
 
-    send_message(sim, &sim->calls[idx].mailbox, MSG_WAKE, event->type, idx);
+    ipc_send_simple(sim, BOX_CALL, idx, MSG_WAKE, event->type, idx, 0);
     return 1;
 }
 
@@ -230,29 +233,48 @@ int run_simulation(Simulation *sim)
 
     static Event batch[MAX_EVENTS]; // events of one model minute
 
-    set_thread_tag("CLK");
+    set_process_tag("CLK");
 
-    pthread_mutex_lock(&sim->world);
+    world_lock(sim);
     output_begin(sim);
     print_header(sim);
     output_end(sim);
-    log_event(sim, "SHIFT STARTED: districts=%d teams=%d calls=%d%s; threads: clock, dispatcher, signals, %d teams, %d calls",
+    log_event(sim, "SHIFT STARTED: districts=%d teams=%d calls=%d%s; processes: clock, dispatcher, %d teams, %s",
               sim->district_count, sim->team_count, sim->call_count, sim->random_calls ? " + random generator" : "",
-              sim->team_count, sim->call_count);
+              sim->team_count, ipc_calls_layout());
     int seeded = seed_events(sim);
-    pthread_mutex_unlock(&sim->world);
+    world_unlock(sim);
 
     SOFT_ASSERT(seeded, "cannot seed initial events", 0);
 
     sim->stop_reason = STOP_ALL_PROCESSED;
     int steps = 0;
+    int reported_stop = 0, reported_close = 0;
 
     for (;;)
     {
-        int stop = 0, close = 0, snapshot = 0;
-        read_control(sim, &stop, &close, &snapshot);
+        // requests of the user received by the signal handlers
+        ControlRequests control;
+        signals_take(&control);
 
-        pthread_mutex_lock(&sim->world);
+        world_lock(sim);
+
+        if (control.stop && !reported_stop)
+        {
+            log_event(sim, "SIGNAL %s", signal_text(control.stop_signal));
+            reported_stop = 1;
+        }
+
+        if (control.close && !reported_close)
+        {
+            log_event(sim, "SIGNAL %s", signal_text(SIGQUIT));
+            reported_close = 1;
+        }
+
+        if (control.snapshot)
+            log_event(sim, "SIGNAL %s", signal_text(SIGUSR1));
+
+        int stop = control.stop, close = control.close, snapshot = control.snapshot;
 
         if (close && !sim->intake_closed)
         {
@@ -268,14 +290,14 @@ int run_simulation(Simulation *sim)
         if (stop)
         {
             sim->stop_reason = STOP_INTERRUPTED;
-            pthread_mutex_unlock(&sim->world);
+            world_unlock(sim);
             break;
         }
 
         if (sim->event_count == 0)
         {
             sim->stop_reason = sim->intake_closed ? STOP_INTAKE_CLOSED : STOP_ALL_PROCESSED;
-            pthread_mutex_unlock(&sim->world);
+            world_unlock(sim);
             break;
         }
 
@@ -284,7 +306,7 @@ int run_simulation(Simulation *sim)
         {
             sim->stop_reason = STOP_SHIFT_LIMIT;
             sim->now = sim->shift_limit;
-            pthread_mutex_unlock(&sim->world);
+            world_unlock(sim);
             break;
         }
 
@@ -296,7 +318,7 @@ int run_simulation(Simulation *sim)
         {
             batch[count] = pop_event(sim);
 
-            // the random generator creates the call (and its thread) right now
+            // the random generator creates the call (and its process) right now
             if (batch[count].type == EV_CALL_ARRIVAL && batch[count].id == GENERATED_CALL)
             {
                 int id = sim->intake_closed ? -1 : spawn_random_call(sim);
@@ -310,23 +332,33 @@ int run_simulation(Simulation *sim)
             count++;
         }
 
-        pthread_mutex_unlock(&sim->world);
+        world_unlock(sim);
 
         // wake the owners of the events
-        quiet_add(&sim->quiet);
+        ipc_quiet_hold(sim);
         for (int idx = 0; idx < count; idx++)
             deliver(sim, &batch[idx]);
-        quiet_done(&sim->quiet);
-        quiet_wait(&sim->quiet);
+        ipc_quiet_release(sim);
+
+        if (!ipc_quiet_wait(sim))
+        {
+            sim->stop_reason = STOP_PROCESS_FAILURE;
+            break;
+        }
 
         // the dispatcher assigns teams, the teams depart
-        quiet_add(&sim->quiet);
-        send_message(sim, &sim->dispatcher_box, MSG_ROUND, 0, 0);
-        quiet_done(&sim->quiet);
-        quiet_wait(&sim->quiet);
+        ipc_quiet_hold(sim);
+        ipc_send_simple(sim, BOX_DISPATCHER, 0, MSG_ROUND, 0, 0, 0);
+        ipc_quiet_release(sim);
+
+        if (!ipc_quiet_wait(sim))
+        {
+            sim->stop_reason = STOP_PROCESS_FAILURE;
+            break;
+        }
 
         // check the model
-        pthread_mutex_lock(&sim->world);
+        world_lock(sim);
         check_invariants(sim);
         sim->completed_events += count;
         steps++;
@@ -334,13 +366,13 @@ int run_simulation(Simulation *sim)
         if (steps % SNAPSHOT_EVERY_STEPS == 0)
             snapshot_locked(sim);
 
-        pthread_mutex_unlock(&sim->world);
+        world_unlock(sim);
 
         sleep_visual(sim);
     }
 
     // the end of the simulation
-    pthread_mutex_lock(&sim->world);
+    world_lock(sim);
 
     switch (sim->stop_reason)
     {
@@ -356,6 +388,11 @@ int run_simulation(Simulation *sim)
 
     case STOP_INTAKE_CLOSED:
         log_event(sim, "ALL ACCEPTED CALLS PROCESSED (intake was closed)");
+        break;
+
+    case STOP_PROCESS_FAILURE:
+        log_event(sim, "SIMULATION ABORTED: a process of the simulation terminated unexpectedly");
+        mark_active_calls_unserved(sim, "a process of the simulation has died");
         break;
 
     case STOP_ALL_PROCESSED:
@@ -376,7 +413,7 @@ int run_simulation(Simulation *sim)
 
     snapshot_locked(sim);
 
-    pthread_mutex_unlock(&sim->world);
+    world_unlock(sim);
 
     return 1;
 }

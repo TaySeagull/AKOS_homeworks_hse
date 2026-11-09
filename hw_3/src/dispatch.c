@@ -3,6 +3,7 @@
 #include "utils_extra.h"
 #include "simulation.h"
 #include "event_queue.h"
+#include "ipc.h"
 #include <limits.h>
 
 #define BASE_SPEED 30.0
@@ -160,7 +161,7 @@ int plan_dispatch(Simulation *sim, Assignment *out, int max)
         team->state = TEAM_EN_ROUTE;
         team->call_id = call->id;
 
-        remove_call_deadlines(sim, call->id); // the call does not wait any more
+        ipc_remove_deadlines(sim, call->id); // the call does not wait any more
 
         sim->dispatches++;
 

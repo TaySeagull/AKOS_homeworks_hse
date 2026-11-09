@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "utils_extra.h"
 #include "utils.h"
+#include "ipc.h"
 #include <stdarg.h>
 #include <string.h>
 #include <strings.h>
@@ -209,37 +210,61 @@ int fd_printf(int fd, const char *fmt, ...)
     return write_all(fd, buffer, (size_t)len);
 }
 
-// name of the current thread, printed in every log line
-static _Thread_local char thread_tag[16] = "main";
+// name of the current process (role), printed in every log line
+static char process_tag[16] = "main";
+
+// descriptor of the log file of this process (-1 = no log); every process
+// opens the same file with O_APPEND, so the lines of all processes are kept
+static int log_descriptor = -1;
 
 /**
- * @brief Sets the name of the current thread for the log
+ * @brief Sets the name of the current process for the log
  * @param tag Short name
  */
-void set_thread_tag(const char *tag)
+void set_process_tag(const char *tag)
 {
     if (tag == NULL)
         return;
 
-    snprintf(thread_tag, sizeof(thread_tag), "%s", tag);
+    snprintf(process_tag, sizeof(process_tag), "%s", tag);
 }
 
 /**
- * @brief Locks the console/log output
+ * @brief Sets the descriptor of the log file of this process
+ * @param fd File descriptor
+ */
+void set_log_fd(int fd)
+{
+    log_descriptor = fd;
+}
+
+/**
+ * @brief Returns the descriptor of the log file of this process
+ * @return File descriptor, or -1 if no log is set
+ */
+int get_log_fd(void)
+{
+    return log_descriptor;
+}
+
+/**
+ * @brief Locks the console/log output (process-shared semaphore)
+ * @param sim Pointer to the simulation structure
  */
 void output_begin(Simulation *sim)
 {
-    if (sim)
-        pthread_mutex_lock(&sim->output_lock);
+    (void)sim;
+    ipc_output_lock();
 }
 
 /**
  * @brief Unlocks the console/log output
+ * @param sim Pointer to the simulation structure
  */
 void output_end(Simulation *sim)
 {
-    if (sim)
-        pthread_mutex_unlock(&sim->output_lock);
+    (void)sim;
+    ipc_output_unlock();
 }
 
 /**
@@ -263,8 +288,8 @@ int log_event(Simulation *sim, const char *fmt, ...)
 
     // model time is in minutes: hours = now / 60, minutes = now % 60
     char line[OUT_BUF_LEN + 32];
-    // {tag} shows which thread produced the line
-    int len = snprintf(line, sizeof(line), "[%02d:%02d] {%-4s} %s\n", sim->now / 60, sim->now % 60, thread_tag, message);
+    // {tag} shows which process (role) produced the line
+    int len = snprintf(line, sizeof(line), "[%02d:%02d] {%-4s} %s\n", sim->now / 60, sim->now % 60, process_tag, message);
 
     if (len < 0)
         return 0;
@@ -273,14 +298,14 @@ int log_event(Simulation *sim, const char *fmt, ...)
         len = (int)sizeof(line) - 1;
 
     // the same order of lines in the console and in the log file
-    pthread_mutex_lock(&sim->output_lock);
+    ipc_output_lock();
 
     write_all(STDOUT_FILENO, line, (size_t)len);
 
-    if (sim->log_fd >= 0)
-        write_all(sim->log_fd, line, (size_t)len);
+    if (log_descriptor >= 0)
+        write_all(log_descriptor, line, (size_t)len);
 
-    pthread_mutex_unlock(&sim->output_lock);
+    ipc_output_unlock();
 
     return 1;
 }

@@ -1,7 +1,7 @@
 #include "output.h"
 #include "utils.h"
 #include "utils_extra.h"
-#include "sync.h"
+#include "ipc.h"
 #include <unistd.h>
 
 #define BOX_WIDTH 62
@@ -48,6 +48,8 @@ static const char *stop_reason_name(StopReason reason)
         return "interrupted by user";
     case STOP_INTAKE_CLOSED:
         return "intake closed by user, active calls finished";
+    case STOP_PROCESS_FAILURE:
+        return "a process terminated unexpectedly";
     default:
         return "unknown";
     }
@@ -83,8 +85,9 @@ int print_header(const Simulation *sim)
               sim->delay_ms,
               sim->return_to_base ? "yes" : "no");
 
-    fd_printf(STDOUT_FILENO, "Threads: clock (main) + dispatcher + signal thread + %d teams + 1 per call | sync: %s\n",
-              sim->team_count, sync_flavour());
+    fd_printf(STDOUT_FILENO, "Processes: clock + dispatcher + %d teams + %s\n",
+              sim->team_count, ipc_calls_layout());
+    fd_printf(STDOUT_FILENO, "IPC: %s\n", ipc_flavour());
 
     if (sim->random_calls)
         fd_printf(STDOUT_FILENO, "Random calls: on | seed=%u | mean interval=%d min\n",
@@ -186,15 +189,13 @@ static void write_plain_summary(const Simulation *sim, int fd, double average_wa
     fd_printf(fd, "Simulation end: %d min\n", sim->now);
     fd_printf(fd, "Processed events: %d\n", sim->completed_events);
     fd_printf(fd, "Invariant violations: %d\n", sim->invariant_errors);
-    fd_printf(fd, "Threads created: %d (%s)\n", sim->threads_started, sync_flavour());
+    fd_printf(fd, "Processes: %d (%s)\n", sim->processes_started, ipc_flavour());
 }
 
 /**
- * @brief Prints the final simulation summary.
- * @details Calls received = served + cancelled + unserved always holds,
- * because every call that arrived ends in exactly one of these states.
- * @param sim Pointer to the simulation structure.
- * @return 1 on success, 0 on failure.
+ * @brief Prints the final simulation summary
+ * @param sim Pointer to the simulation structure
+ * @return 1 on success, 0 on failure\
  * Made with the help of AI
  */
 int print_summary(const Simulation *sim)
@@ -252,13 +253,16 @@ int print_summary(const Simulation *sim)
     snprintf(line, sizeof(line), "Invariant violations: %d", sim->invariant_errors);
     print_box_line(line);
 
-    snprintf(line, sizeof(line), "Threads created:      %d (%s)", sim->threads_started, sync_flavour());
+    snprintf(line, sizeof(line), "Processes:            %d (clock included)", sim->processes_started);
+    print_box_line(line);
+
+    snprintf(line, sizeof(line), "IPC: %s", ipc_flavour());
     print_box_line(line);
 
     fd_printf(STDOUT_FILENO, "╚══════════════════════════════════════════════════════════════╝\n");
 
-    if (sim->log_fd >= 0)
-        write_plain_summary(sim, sim->log_fd, average_waiting, average_service);
+    if (get_log_fd() >= 0)
+        write_plain_summary(sim, get_log_fd(), average_waiting, average_service);
 
     return 1;
 }
@@ -275,17 +279,19 @@ int print_usage(const char *program)
     fd_printf(
         STDOUT_FILENO,
         "Usage: %s [-c config] [-d delay_ms] [-s nearest|fastest] [-l logfile]\n"
-        "          [-t shift_minutes] [-r seed] [-h]\n"
+        "          [-t shift_minutes] [-r seed] [-n session] [-h]\n"
         "  -c file    configuration file (default config.txt)\n"
         "  -d ms      visual delay after every model minute with events, ms (0 = no delay)\n"
         "  -s name    team selection strategy: nearest | fastest\n"
         "  -l file    log file (default dispatch.log)\n"
         "  -t min     shift length in minutes, 0 = unlimited (stop with Ctrl+C)\n"
         "  -r seed    enable the random call generator with the given seed\n"
+        "  -n name    session name of the IPC objects (independent versions, default main)\n"
         "  -h         show this help\n"
         "Signals: Ctrl+C (SIGINT) or SIGTERM - stop now, active calls become unserved;\n"
         "         Ctrl+\\ (SIGQUIT) - stop accepting calls and finish the active ones;\n"
         "         SIGUSR1 - print the live status.\n"
+        "         Signals sent to any other process of the simulation are forwarded to the clock.\n"
         "Command-line options override the values from the configuration file.\n",
         program
     );

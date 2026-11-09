@@ -1,7 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "generator.h"
 #include "simulation.h"
-#include "threads.h"
+#include "ipc.h"
 #include "utils.h"
 #include "utils_extra.h"
 #include <stdlib.h>
@@ -38,10 +38,10 @@ static int find_free_call_slot(Simulation *sim)
         CallState state = sim->calls[idx].state;
         int closed = state == CALL_COMPLETED || state == CALL_CANCELLED || state == CALL_UNSERVED;
 
-        // the thread of a closed call is idle, it is stopped and joined
+        // the process of a closed call is idle, it is stopped and waited for
         if (closed)
         {
-            join_call_thread(sim, idx);
+            ipc_stop_call(sim, idx);
             return idx;
         }
     }
