@@ -1,0 +1,151 @@
+[00:00] {CLK } SHIFT STARTED: districts=5 teams=6 calls=18; processes: clock, dispatcher, 6 teams, 1 callers process for all calls
+[00:05] {C001} CALL #001 ARRIVED: district=EAST (x=8, y=3) priority=3 spec=MEDIC service=12 min max_wait=25 min
+[00:05] {DSP } DISPATCH: CALL #001 priority=3 spec=MEDIC waited 0 min -> B2 (NEAREST strategy)
+[00:05] {B2  } B2 DEPARTED from NORTH to EAST for CALL #001, travel TIME=4 min
+[00:09] {B2  } B2 ARRIVED at EAST for CALL #001 (after 4 min of waiting)
+[00:09] {B2  } B2 STARTED HELP on CALL #001, it will take 12 min
+[00:12] {C002} CALL #002 ARRIVED: district=WEST (x=2, y=7) priority=1 spec=REANIM service=18 min max_wait=30 min
+[00:12] {DSP } DISPATCH: CALL #002 priority=1 spec=REANIM waited 0 min -> B4 (NEAREST strategy)
+[00:12] {B4  } B4 DEPARTED from WEST to WEST for CALL #002, travel TIME=1 min
+[00:13] {B4  } B4 ARRIVED at WEST for CALL #002 (after 1 min of waiting)
+[00:13] {B4  } B4 STARTED HELP on CALL #002, it will take 18 min
+[00:18] {C003} CALL #003 ARRIVED: district=NORTH (x=5, y=9) priority=2 spec=MEDIC service=9 min max_wait=20 min
+[00:18] {DSP } DISPATCH: CALL #003 priority=2 spec=MEDIC waited 0 min -> B1 (NEAREST strategy)
+[00:18] {B1  } B1 DEPARTED from BASE to NORTH for CALL #003, travel TIME=6 min
+[00:21] {B2  } CALL #001 HELP FINISHED by B2; total wait=4 min, service=12 min
+[00:21] {B2  } B2 RELEASED; returning to base NORTH, TIME=4 min
+[00:24] {B1  } B1 ARRIVED at NORTH for CALL #003 (after 6 min of waiting)
+[00:24] {B1  } B1 STARTED HELP on CALL #003, it will take 9 min
+[00:25] {B2  } B2 RETURNED to base NORTH and is AVAILABLE
+[00:25] {C004} CALL #004 ARRIVED: district=SOUTH (x=7, y=1) priority=3 spec=FIRE service=15 min max_wait=35 min
+[00:25] {DSP } DISPATCH: CALL #004 priority=3 spec=FIRE waited 0 min -> B5 (NEAREST strategy)
+[00:25] {B5  } B5 DEPARTED from SOUTH to SOUTH for CALL #004, travel TIME=1 min
+[00:26] {B5  } B5 ARRIVED at SOUTH for CALL #004 (after 1 min of waiting)
+[00:26] {B5  } B5 STARTED HELP on CALL #004, it will take 15 min
+[00:31] {B4  } CALL #002 HELP FINISHED by B4; total wait=1 min, service=18 min
+[00:31] {B4  } B4 RELEASED and AVAILABLE in district WEST
+[00:32] {C005} CALL #005 ARRIVED: district=EAST (x=3, y=4) priority=2 spec=REANIM service=12 min max_wait=22 min
+[00:32] {DSP } DISPATCH: CALL #005 priority=2 spec=REANIM waited 0 min -> B3 (NEAREST strategy)
+[00:32] {B3  } B3 DEPARTED from EAST to EAST for CALL #005, travel TIME=1 min
+[00:33] {B1  } CALL #003 HELP FINISHED by B1; total wait=6 min, service=9 min
+[00:33] {B1  } B1 RELEASED; returning to base BASE, TIME=6 min
+[00:33] {B3  } B3 ARRIVED at EAST for CALL #005 (after 1 min of waiting)
+[00:33] {B3  } B3 STARTED HELP on CALL #005, it will take 12 min
+[00:39] {B1  } B1 RETURNED to base BASE and is AVAILABLE
+[00:41] {B5  } CALL #004 HELP FINISHED by B5; total wait=1 min, service=15 min
+[00:41] {B5  } B5 RELEASED and AVAILABLE in district SOUTH
+[00:41] {C006} CALL #006 ARRIVED: district=BASE (x=1, y=1) priority=3 spec=POLICE service=8 min max_wait=25 min
+[00:41] {DSP } DISPATCH: CALL #006 priority=3 spec=POLICE waited 0 min -> B6 (NEAREST strategy)
+[00:41] {B6  } B6 DEPARTED from BASE to BASE for CALL #006, travel TIME=1 min
+[00:42] {B6  } B6 ARRIVED at BASE for CALL #006 (after 1 min of waiting)
+[00:42] {B6  } B6 STARTED HELP on CALL #006, it will take 8 min
+[00:45] {B3  } CALL #005 HELP FINISHED by B3; total wait=1 min, service=12 min
+[00:45] {B3  } B3 RELEASED and AVAILABLE in district EAST
+[00:47] {C007} CALL #007 ARRIVED: district=WEST (x=9, y=2) priority=2 spec=MEDIC service=14 min max_wait=20 min
+[00:47] {DSP } DISPATCH: CALL #007 priority=2 spec=MEDIC waited 0 min -> B1 (NEAREST strategy)
+[00:47] {B1  } B1 DEPARTED from BASE to WEST for CALL #007, travel TIME=5 min
+[00:50] {B6  } CALL #006 HELP FINISHED by B6; total wait=1 min, service=8 min
+[00:50] {B6  } B6 RELEASED and AVAILABLE in district BASE
+[00:52] {B1  } B1 ARRIVED at WEST for CALL #007 (after 5 min of waiting)
+[00:52] {B1  } B1 STARTED HELP on CALL #007, it will take 14 min
+[00:55] {C008} CALL #008 ARRIVED: district=SOUTH (x=4, y=8) priority=1 spec=FIRE service=20 min max_wait=40 min
+[00:55] {DSP } DISPATCH: CALL #008 priority=1 spec=FIRE waited 0 min -> B5 (NEAREST strategy)
+[00:55] {B5  } B5 DEPARTED from SOUTH to SOUTH for CALL #008, travel TIME=1 min
+[00:56] {B5  } B5 ARRIVED at SOUTH for CALL #008 (after 1 min of waiting)
+[00:56] {B5  } B5 STARTED HELP on CALL #008, it will take 20 min
+[01:05] {C009} CALL #009 ARRIVED: district=NORTH (x=6, y=6) priority=3 spec=MEDIC service=10 min max_wait=18 min
+[01:05] {DSP } DISPATCH: CALL #009 priority=3 spec=MEDIC waited 0 min -> B2 (NEAREST strategy)
+[01:05] {B2  } B2 DEPARTED from NORTH to NORTH for CALL #009, travel TIME=1 min
+[01:06] {B1  } CALL #007 HELP FINISHED by B1; total wait=5 min, service=14 min
+[01:06] {B1  } B1 RELEASED; returning to base BASE, TIME=5 min
+[01:06] {B2  } B2 ARRIVED at NORTH for CALL #009 (after 1 min of waiting)
+[01:06] {B2  } B2 STARTED HELP on CALL #009, it will take 10 min
+[01:11] {B1  } B1 RETURNED to base BASE and is AVAILABLE
+[01:12] {C010} CALL #010 ARRIVED: district=EAST (x=2, y=2) priority=2 spec=REANIM service=16 min max_wait=25 min
+[01:12] {DSP } DISPATCH: CALL #010 priority=2 spec=REANIM waited 0 min -> B3 (NEAREST strategy)
+[01:12] {B3  } B3 DEPARTED from EAST to EAST for CALL #010, travel TIME=1 min
+[01:13] {B3  } B3 ARRIVED at EAST for CALL #010 (after 1 min of waiting)
+[01:13] {B3  } B3 STARTED HELP on CALL #010, it will take 16 min
+[01:16] {B5  } CALL #008 HELP FINISHED by B5; total wait=1 min, service=20 min
+[01:16] {B5  } B5 RELEASED and AVAILABLE in district SOUTH
+[01:16] {B2  } CALL #009 HELP FINISHED by B2; total wait=1 min, service=10 min
+[01:16] {B2  } B2 RELEASED and AVAILABLE in district NORTH
+[01:25] {C011} CALL #011 ARRIVED: district=WEST (x=5, y=3) priority=3 spec=MEDIC service=11 min max_wait=18 min
+[01:25] {DSP } DISPATCH: CALL #011 priority=3 spec=MEDIC waited 0 min -> B1 (NEAREST strategy)
+[01:25] {B1  } B1 DEPARTED from BASE to WEST for CALL #011, travel TIME=5 min
+[01:29] {B3  } CALL #010 HELP FINISHED by B3; total wait=1 min, service=16 min
+[01:29] {B3  } B3 RELEASED and AVAILABLE in district EAST
+[01:30] {B1  } B1 ARRIVED at WEST for CALL #011 (after 5 min of waiting)
+[01:30] {B1  } B1 STARTED HELP on CALL #011, it will take 11 min
+[01:40] {C012} CALL #012 ARRIVED: district=SOUTH (x=8, y=8) priority=2 spec=FIRE service=13 min max_wait=30 min
+[01:40] {DSP } DISPATCH: CALL #012 priority=2 spec=FIRE waited 0 min -> B5 (NEAREST strategy)
+[01:40] {B5  } B5 DEPARTED from SOUTH to SOUTH for CALL #012, travel TIME=1 min
+[01:41] {B1  } CALL #011 HELP FINISHED by B1; total wait=5 min, service=11 min
+[01:41] {B1  } B1 RELEASED; returning to base BASE, TIME=5 min
+[01:41] {B5  } B5 ARRIVED at SOUTH for CALL #012 (after 1 min of waiting)
+[01:41] {B5  } B5 STARTED HELP on CALL #012, it will take 13 min
+[01:46] {B1  } B1 RETURNED to base BASE and is AVAILABLE
+[01:54] {B5  } CALL #012 HELP FINISHED by B5; total wait=1 min, service=13 min
+[01:54] {B5  } B5 RELEASED and AVAILABLE in district SOUTH
+[01:55] {C013} CALL #013 ARRIVED: district=NORTH (x=3, y=7) priority=1 spec=REANIM service=22 min max_wait=35 min
+[01:55] {DSP } DISPATCH: CALL #013 priority=1 spec=REANIM waited 0 min -> B3 (NEAREST strategy)
+[01:55] {B3  } B3 DEPARTED from EAST to NORTH for CALL #013, travel TIME=4 min
+[01:59] {B3  } B3 ARRIVED at NORTH for CALL #013 (after 4 min of waiting)
+[01:59] {B3  } B3 STARTED HELP on CALL #013, it will take 22 min
+[02:10] {C014} CALL #014 ARRIVED: district=EAST (x=6, y=5) priority=3 spec=MEDIC service=8 min max_wait=20 min
+[02:10] {DSP } DISPATCH: CALL #014 priority=3 spec=MEDIC waited 0 min -> B2 (NEAREST strategy)
+[02:10] {B2  } B2 DEPARTED from NORTH to EAST for CALL #014, travel TIME=4 min
+[02:14] {B2  } B2 ARRIVED at EAST for CALL #014 (after 4 min of waiting)
+[02:14] {B2  } B2 STARTED HELP on CALL #014, it will take 8 min
+[02:21] {B3  } CALL #013 HELP FINISHED by B3; total wait=4 min, service=22 min
+[02:21] {B3  } B3 RELEASED; returning to base EAST, TIME=4 min
+[02:22] {B2  } CALL #014 HELP FINISHED by B2; total wait=4 min, service=8 min
+[02:22] {B2  } B2 RELEASED; returning to base NORTH, TIME=4 min
+[02:25] {B3  } B3 RETURNED to base EAST and is AVAILABLE
+[02:25] {C015} CALL #015 ARRIVED: district=BASE (x=1, y=4) priority=2 spec=POLICE service=7 min max_wait=18 min
+[02:25] {DSP } DISPATCH: CALL #015 priority=2 spec=POLICE waited 0 min -> B6 (NEAREST strategy)
+[02:25] {B6  } B6 DEPARTED from BASE to BASE for CALL #015, travel TIME=1 min
+[02:26] {B2  } B2 RETURNED to base NORTH and is AVAILABLE
+[02:26] {B6  } B6 ARRIVED at BASE for CALL #015 (after 1 min of waiting)
+[02:26] {B6  } B6 STARTED HELP on CALL #015, it will take 7 min
+[02:33] {B6  } CALL #015 HELP FINISHED by B6; total wait=1 min, service=7 min
+[02:33] {B6  } B6 RELEASED and AVAILABLE in district BASE
+[02:45] {C016} CALL #016 ARRIVED: district=WEST (x=9, y=9) priority=3 spec=MEDIC service=12 min max_wait=22 min
+[02:45] {DSP } DISPATCH: CALL #016 priority=3 spec=MEDIC waited 0 min -> B1 (NEAREST strategy)
+[02:45] {B1  } B1 DEPARTED from BASE to WEST for CALL #016, travel TIME=5 min
+[02:50] {B1  } B1 ARRIVED at WEST for CALL #016 (after 5 min of waiting)
+[02:50] {B1  } B1 STARTED HELP on CALL #016, it will take 12 min
+[03:00] {C017} CALL #017 ARRIVED: district=SOUTH (x=2, y=6) priority=2 spec=FIRE service=18 min max_wait=30 min
+[03:00] {DSP } DISPATCH: CALL #017 priority=2 spec=FIRE waited 0 min -> B5 (NEAREST strategy)
+[03:00] {B5  } B5 DEPARTED from SOUTH to SOUTH for CALL #017, travel TIME=1 min
+[03:01] {B5  } B5 ARRIVED at SOUTH for CALL #017 (after 1 min of waiting)
+[03:01] {B5  } B5 STARTED HELP on CALL #017, it will take 18 min
+[03:02] {B1  } CALL #016 HELP FINISHED by B1; total wait=5 min, service=12 min
+[03:02] {B1  } B1 RELEASED; returning to base BASE, TIME=5 min
+[03:07] {B1  } B1 RETURNED to base BASE and is AVAILABLE
+[03:19] {B5  } CALL #017 HELP FINISHED by B5; total wait=1 min, service=18 min
+[03:19] {B5  } B5 RELEASED and AVAILABLE in district SOUTH
+[03:20] {C018} CALL #018 ARRIVED: district=EAST (x=7, y=3) priority=3 spec=REANIM service=10 min max_wait=20 min
+[03:20] {DSP } DISPATCH: CALL #018 priority=3 spec=REANIM waited 0 min -> B3 (NEAREST strategy)
+[03:20] {B3  } B3 DEPARTED from EAST to EAST for CALL #018, travel TIME=1 min
+[03:21] {B3  } B3 ARRIVED at EAST for CALL #018 (after 1 min of waiting)
+[03:21] {B3  } B3 STARTED HELP on CALL #018, it will take 10 min
+[03:31] {B3  } CALL #018 HELP FINISHED by B3; total wait=1 min, service=10 min
+[03:31] {B3  } B3 RELEASED and AVAILABLE in district EAST
+[03:31] {CLK } ALL CALLS PROCESSED
+[03:31] {CLK } SHIFT FINISHED
+
+=== SHIFT SUMMARY ===
+Stop reason: all calls processed
+Calls received: 18
+Served: 18
+Cancelled: 0
+Unserved: 0
+Dispatches: 18
+Priority escalations: 0
+Average waiting: 2.44 min/call
+Average service: 13.06 min/call
+Simulation end: 211 min
+Processed events: 61
+Invariant violations: 0
+Processes: 9 (independent + named POSIX sems + POSIX shm)

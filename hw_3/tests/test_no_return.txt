@@ -1,0 +1,18 @@
+# return_to_base=0: after the work the team stays in the district of the call
+# and takes the next call from there.
+delay_ms=0
+shift_limit=100
+escalation_enabled=0
+return_to_base=0
+strategy=NEAREST
+
+[DISTRICTS]
+BASE 0 5
+NORTH 5 0
+
+[TEAMS]
+1 MEDIC 30 BASE
+
+[CALLS]
+1 0 NORTH 1 1 1 MEDIC 5 40 0 0
+2 20 NORTH 2 2 1 MEDIC 5 40 0 0

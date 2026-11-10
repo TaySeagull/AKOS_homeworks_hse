@@ -1,0 +1,25 @@
+[00:00] {CLK } SHIFT STARTED: districts=3 teams=2 calls=1; processes: clock, dispatcher, 2 teams, 1 process per call
+[00:00] {C001} CALL #001 ARRIVED: district=EAST (x=1, y=1) priority=1 spec=MEDIC service=5 min max_wait=20 min
+[00:00] {DSP } DISPATCH: CALL #001 priority=1 spec=MEDIC waited 0 min -> B2 (FASTEST strategy)
+[00:00] {B2  } B2 DEPARTED from NORTH to EAST for CALL #001, travel TIME=1 min
+[00:01] {B2  } B2 ARRIVED at EAST for CALL #001 (after 1 min of waiting)
+[00:01] {B2  } B2 STARTED HELP on CALL #001, it will take 5 min
+[00:06] {B2  } CALL #001 HELP FINISHED by B2; total wait=1 min, service=5 min
+[00:06] {B2  } B2 RELEASED and AVAILABLE in district EAST
+[00:06] {CLK } ALL CALLS PROCESSED
+[00:06] {CLK } SHIFT FINISHED
+
+=== SHIFT SUMMARY ===
+Stop reason: all calls processed
+Calls received: 1
+Served: 1
+Cancelled: 0
+Unserved: 0
+Dispatches: 1
+Priority escalations: 0
+Average waiting: 1.00 min/call
+Average service: 5.00 min/call
+Simulation end: 6 min
+Processed events: 3
+Invariant violations: 0
+Processes: 5 (fork + unnamed POSIX sems in POSIX shm)
