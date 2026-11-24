@@ -1,0 +1,16 @@
+# There is no road to ISLAND (-1), so the call can not be served.
+delay_ms=0
+shift_limit=100
+escalation_enabled=0
+return_to_base=1
+strategy=NEAREST
+
+[DISTRICTS]
+BASE   0 -1
+ISLAND -1 0
+
+[TEAMS]
+1 MEDIC 30 BASE
+
+[CALLS]
+1 0 ISLAND 1 1 1 MEDIC 5 15 0 0

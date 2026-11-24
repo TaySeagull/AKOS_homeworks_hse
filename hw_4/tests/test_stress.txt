@@ -1,0 +1,36 @@
+# Overloaded shift: 2 teams, 16 calls. All event kinds appear:
+# queueing, escalation, cancellation, unserved calls and the shift limit.
+delay_ms=0
+shift_limit=120
+escalation_enabled=1
+return_to_base=1
+strategy=FASTEST
+
+[DISTRICTS]
+BASE   0 4 6
+NORTH  4 0 5
+EAST   6 5 0
+
+[TEAMS]
+1 MEDIC  30 BASE
+2 MEDIC  45 NORTH
+3 FIRE   35 EAST
+
+[CALLS]
+# id arrival district x y priority spec service max_wait escalation cancel
+1   0  EAST   1 1 3 MEDIC 20 30 5 0
+2   1  NORTH  2 2 2 MEDIC 25 30 5 0
+3   2  BASE   3 3 3 MEDIC 15 25 4 12
+4   3  EAST   4 4 3 MEDIC 10 20 4 0
+5   4  NORTH  5 5 1 MEDIC 10 40 0 0
+6   5  BASE   6 6 3 FIRE  15 30 5 0
+7   8  EAST   7 7 2 FIRE  10 30 5 0
+8   10 NORTH  8 8 3 MEDIC 10 35 6 0
+9   15 BASE   9 9 2 MEDIC 10 35 6 8
+10  30 EAST   1 2 3 MEDIC 10 50 5 0
+11  40 NORTH  2 3 3 MEDIC 10 50 5 0
+12  60 BASE   3 4 2 FIRE  20 30 5 0
+13  70 EAST   4 5 1 MEDIC 15 40 0 0
+14  90 NORTH  5 6 3 MEDIC 30 40 5 0
+15  100 BASE  6 7 2 MEDIC 30 40 5 0
+16  130 EAST  7 8 1 MEDIC 5 40 0 0
