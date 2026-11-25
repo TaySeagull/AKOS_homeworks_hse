@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 #
-# Starts the independent programs of one session in this terminal:
+# Starts the independent programs of homework 3 (they are kept in the project of
+# homework 4, the network version reuses their simulation logic) in this terminal:
 # the clients are started in the background (in random order, before the
 # clock: they wait for it), the clock works in the foreground.
 #
-#   ./run_independent.sh shm [clock options]     - 7-8 points version
-#   ./run_independent.sh mq  [clock options]     - 9-10 points version
+#   ./run_independent.sh shm [clock options]     - POSIX shared memory + named semaphores
+#   ./run_independent.sh mq  [clock options]     - POSIX message queues + named semaphores
+#
+# The network version of homework 4 is started with run_network.sh.
 #
 # Example: ./run_independent.sh mq -c tests/test_stress.txt -d 50
 # Ctrl+C / Ctrl+\ work as usual: they reach every process of the

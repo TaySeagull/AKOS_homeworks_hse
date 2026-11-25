@@ -25,7 +25,10 @@ typedef enum
     MSG_DONE,             // any -> clock: one counted message has been handled completely
     MSG_HELLO,            // client -> clock: a new process has registered
     MSG_WELCOME,          // clock -> client: configuration path and command-line overrides
-    MSG_STATS             // client -> clock: final counters of the process before it exits
+    MSG_STATS,            // client -> clock: final counters of the process before it exits
+
+    // Network version: the whole state has come from the server
+    MSG_RESYNC
 } MsgType;
 
 /**
@@ -39,6 +42,7 @@ typedef enum
     ROLE_TEAM,       // one team
     ROLE_CALL,       // one call
     ROLE_CALLERS,    // the family of all calls
+    ROLE_OBSERVER,   // network version: a client that only watches the whole app
     ROLE_COUNT
 } Role;
 
@@ -56,7 +60,8 @@ typedef enum
 
 /**
  * @struct Settings
- * @brief Command-line overrides sent to the clients of the message-queue version
+ * @brief Command-line overrides sent to the clients of the message-queue and
+ * of the network version (MSG_WELCOME)
  */
 typedef struct
 {

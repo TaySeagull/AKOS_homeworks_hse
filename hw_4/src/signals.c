@@ -90,6 +90,26 @@ void signals_take(ControlRequests *requests)
 }
 
 /**
+ * @brief Server of the network version: a request that a client has sent as a frame
+ * @param request SIGNAL_REQUEST_STOP / _CLOSE / _SNAPSHOT
+ * @param signal_number Number of the signal that the client has caught
+ */
+void signals_remote_request(int request, int signal_number)
+{
+    if (request == SIGNAL_REQUEST_STOP)
+    {
+        if (!stop_flag)
+            stop_signal = signal_number != 0 ? signal_number : SIGTERM;
+
+        stop_flag = 1;
+    }
+    else if (request == SIGNAL_REQUEST_CLOSE)
+        close_flag = 1;
+    else if (request == SIGNAL_REQUEST_SNAPSHOT)
+        snapshot_flag = 1;
+}
+
+/**
  * @brief 1 if a stop signal has been received
  */
 int signals_stop_requested(void)

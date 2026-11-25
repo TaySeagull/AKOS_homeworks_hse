@@ -91,7 +91,7 @@ typedef enum
     STOP_SHIFT_LIMIT,       // the next event is after the end of the shift
     STOP_INTERRUPTED,       // SIGINT / SIGTERM from the user
     STOP_INTAKE_CLOSED,     // SIGQUIT
-    STOP_PROCESS_FAILURE    // a process of the simulation died unexpectedly
+    STOP_PROCESS_FAILURE    // a process died unexpectedly / a client did not come back
 } StopReason;
 
 /**
@@ -210,8 +210,10 @@ typedef struct
     int next_call_id;      // id of the next generated call
 
     int intake_closed;     // 1 after SIGQUIT: new calls are not accepted any more
+    int show_status;       // 1 = the clock prints the live status box by itself
+                           // (network version: off, the observer clients show it)
 
-    // processes
+    // processes (the network version uses the pids only for the log)
     pid_t clock_pid;        // pid of the clock process, clients forward signals to it
     pid_t dispatcher_pid;   // pid of the dispatcher process
     pid_t callers_pid;      // pid of the "callers" family process

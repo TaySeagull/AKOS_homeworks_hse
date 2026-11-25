@@ -305,6 +305,10 @@ int log_event(Simulation *sim, const char *fmt, ...)
     if (log_descriptor >= 0)
         write_all(log_descriptor, line, (size_t)len);
 
+    // network version: the line also goes to the observers (a client sends it to
+    // the server, the server writes the central log and gives it to the observers)
+    ipc_log_line(line);
+
     ipc_output_unlock();
 
     return 1;

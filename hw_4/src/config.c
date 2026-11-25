@@ -32,6 +32,8 @@ int set_defaults(Simulation *sim)
     sim->seed = 1;
     sim->random_interval = 10;   // a new random call every ~10 minutes
     sim->next_call_id = 1;
+    sim->show_status = 1;        // the clock shows the live status box itself
+                                 // (the server of the network version switches it off)
 
     return 1;
 }

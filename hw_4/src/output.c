@@ -279,7 +279,11 @@ int print_usage(const char *program)
     fd_printf(
         STDOUT_FILENO,
         "Usage: %s [-c config] [-d delay_ms] [-s nearest|fastest] [-l logfile]\n"
+#ifdef IPC_NET
+        "          [-t shift_minutes] [-r seed] [-p port] [-b address] [-T seconds] [-S] [-h]\n"
+#else
         "          [-t shift_minutes] [-r seed] [-n session] [-h]\n"
+#endif
         "  -c file    configuration file (default config.txt)\n"
         "  -d ms      visual delay after every model minute with events, ms (0 = no delay)\n"
         "  -s name    team selection strategy: nearest | fastest\n"
@@ -287,11 +291,24 @@ int print_usage(const char *program)
         "  -t min     shift length in minutes, 0 = unlimited (stop with Ctrl+C)\n"
         "  -r seed    enable the random call generator with the given seed\n"
         "  -n name    session name of the IPC objects (independent versions, default main)\n"
+#ifdef IPC_NET
+        "  -p port    TCP port of this server (default 5035)\n"
+        "  -b addr    interface to listen on (default: every interface of the computer)\n"
+        "  -T sec     how long to wait for a client: the first registration and a client\n"
+        "             that was stopped during the shift (0 = without a limit)\n"
+        "  -S         show the live status box in the terminal of the server as well\n"
+#endif
         "  -h         show this help\n"
         "Signals: Ctrl+C (SIGINT) or SIGTERM - stop now, active calls become unserved;\n"
         "         Ctrl+\\ (SIGQUIT) - stop accepting calls and finish the active ones;\n"
         "         SIGUSR1 - print the live status.\n"
+#ifdef IPC_NET
+        "         A signal in the terminal of a client is sent to the server as a frame of\n"
+        "         the protocol (a signal cannot reach a process on another computer).\n"
+#else
         "         Signals sent to any other process of the simulation are forwarded to the clock.\n"
+#endif
+
         "Command-line options override the values from the configuration file.\n",
         program
     );

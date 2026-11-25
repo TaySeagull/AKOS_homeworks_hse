@@ -82,6 +82,15 @@ void ipc_publish_team(Simulation *sim, int team_idx);
 // Applies the attachments of a received message to the mirror
 void ipc_apply(Simulation *sim, const Message *message);
 
+// Network version: log is being handed to observer clients and to the central logs
+void ipc_log_line(const char *line);
+
+// Network version: server sends state to the observer clients
+void ipc_publish_state(Simulation *sim, int finished);
+
+// Pause of the clock between two modelss
+void ipc_idle(Simulation *sim, int ms);
+
 // Role and index of the calling process
 void ipc_set_self(Role role, int idx);
 Role ipc_self_role(void);

@@ -8,6 +8,10 @@
 #include "utils.h"
 #include "utils_extra.h"
 
+#ifdef IPC_NET
+#include "net.h" // the network version needs the address of the server
+#endif
+
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
@@ -19,6 +23,19 @@
 #define ARGS_ERROR 0 // wrong arguments, exit with code 1
 #define ARGS_OK 1    // continue
 #define ARGS_HELP 2  // -h was given, exit with code 0
+
+#ifdef IPC_NET
+// options of the network version; the address and the port are given in the
+// command line, so the same programs fit into any network
+#define SERVER_OPTIONS "c:d:s:l:t:r:n:p:b:T:Sh"
+
+static const char *bind_host = "";  // -b: interface to listen on ("" = all of them)
+static int listen_port = NET_DEFAULT_PORT; // -p
+static int client_timeout = 0;      // -T: seconds to wait for a client that is gone
+static int local_status = 0;        // -S: show the live status box in this terminal
+#else
+#define SERVER_OPTIONS "c:d:s:l:t:r:n:h"
+#endif
 
 /**
  * @brief Parses command-line arguments
@@ -43,10 +60,38 @@ static int parse_arguments(int argc, char **argv, Simulation *sim, const char **
     optind = 1; // restart getopt() from the first argument
     opterr = 1;
 
-    while ((option = getopt(argc, argv, "c:d:s:l:t:r:n:h")) != -1)
+    while ((option = getopt(argc, argv, SERVER_OPTIONS)) != -1)
     {
         switch (option)
         {
+#ifdef IPC_NET
+        case 'p':
+            if (!parse_int_strict(optarg, &number) || number < 1 || number > 65535)
+            {
+                fprintf(stderr, "Invalid port '%s': a number between 1 and 65535 is expected\n", optarg);
+                return ARGS_ERROR;
+            }
+            listen_port = number;
+            break;
+
+        case 'b':
+            bind_host = optarg;
+            break;
+
+        case 'T':
+            if (!parse_int_strict(optarg, &number) || number < 0)
+            {
+                fprintf(stderr, "Invalid timeout '%s': seconds >= 0 are expected (0 = wait forever)\n", optarg);
+                return ARGS_ERROR;
+            }
+            client_timeout = number;
+            break;
+
+        case 'S':
+            local_status = 1;
+            break;
+#endif
+
         case 'c':
             *config_path = optarg;
             break;
@@ -179,6 +224,14 @@ int main(int argc, char **argv)
 
     if (!validate_simulation(&loaded))
         return 1;
+
+#ifdef IPC_NET
+    // this terminal shows only what the server itself does (-S switches it on)
+    loaded.show_status = local_status;
+
+    ipc_set_endpoint(bind_host, listen_port);
+    ipc_set_lost_timeout(client_timeout);
+#endif
 
     if (!open_log_file(log_path))
         return 1;

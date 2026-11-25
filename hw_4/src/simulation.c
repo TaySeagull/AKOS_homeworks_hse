@@ -363,12 +363,17 @@ int run_simulation(Simulation *sim)
         sim->completed_events += count;
         steps++;
 
-        if (steps % SNAPSHOT_EVERY_STEPS == 0)
+        if (sim->show_status && steps % SNAPSHOT_EVERY_STEPS == 0)
             snapshot_locked(sim);
 
         world_unlock(sim);
 
-        sleep_visual(sim);
+        // the observer clients of the network version get the whole state
+        ipc_publish_state(sim, 0);
+
+        // the pause of the clock; the server of the network version serves its
+        // sockets while it waits, so a new observer can come at any moment
+        ipc_idle(sim, sim->delay_ms);
     }
 
     // the end of the simulation
@@ -411,7 +416,8 @@ int run_simulation(Simulation *sim)
 
     log_event(sim, "SHIFT FINISHED");
 
-    snapshot_locked(sim);
+    if (sim->show_status)
+        snapshot_locked(sim);
 
     world_unlock(sim);
 

@@ -221,6 +221,37 @@ void ipc_output_unlock(void)
 }
 
 /**
+ * @brief Only the network version sends the lines of the log somewhere else
+ * @param line The finished line
+ */
+void ipc_log_line(const char *line)
+{
+    (void)line;
+}
+
+/**
+ * @brief Only the network version has observer programs
+ * @param sim The model
+ * @param finished 1 = the last state of the shift
+ */
+void ipc_publish_state(Simulation *sim, int finished)
+{
+    (void)sim;
+    (void)finished;
+}
+
+/**
+ * @brief Pause of the clock between two model minutes
+ * @param sim The model
+ * @param ms Length of the pause in milliseconds
+ */
+void ipc_idle(Simulation *sim, int ms)
+{
+    (void)ms;
+    sleep_visual(sim); // the delay of the configuration / of the command line
+}
+
+/**
  * @brief Creates the semaphores of a mailbox and empties it
  * @param box The index of the mailbox
  * @return 1 on success, 0 on failure

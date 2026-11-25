@@ -1,58 +1,65 @@
-**# Emergency Dispatch Simulator with processes**
+# Emergency Dispatch Simulator over the Network
 
-Homework 3 for AKOS, variant 35
+Homework 4 for AKOS, variant 35
 
-A discrete-event simulation of an emergency dispatch service, implemented in C using processes and POSIX IPC.
+A discrete-event simulation of an emergency dispatch service, implemented in C as a client-server application using TCP sockets.
 
-The program simulates call intake, the dispatch of specialized teams, team movement between districts, call servicing, priority escalation, cancellation by the caller, unserved calls due to maximum waiting time, the shift limit and the return of teams to base.
+The program simulates call intake, dispatching specialized teams, team movement between districts, call servicing, priority escalation, cancellation, unserved calls, shift limits and return to base.
 
-Each entity with independent behaviour is represented by a separate process: the clock, dispatcher, teams and calls.
+Each entity with independent behaviour is represented by a separate program: the server (clock), dispatcher, teams and callers. Multiple observer programs can monitor the simulation simultaneously.
 
-Four implementations are available:
+The simulation logic is the same as in homework 3. Homework 4 adds a network communication layer. All four implementations from homework 3 are preserved.
 
-- `ed_fork_named` — parent process creates child processes using `fork()`, with named POSIX semaphores and shared memory
-- `ed_fork_unnamed` — parent process creates child processes using `fork()`, with unnamed POSIX semaphores and shared memory
-- `ed_shm_*` — independent programs communicating through POSIX shared memory and named semaphores
-- `ed_mq_*` — independent programs communicating through POSIX message queues and named semaphores
+## Programs
 
-All implementations use the same simulation logic. Only the IPC and synchronization layers differ.
+| Program | Role |
+|---|---|
+| `ed_net_server` | Clock, event queue, message router and central log |
+| `ed_net_dispatcher` | Assigns available teams to waiting calls |
+| `ed_net_team` | Handles team movement and servicing |
+| `ed_net_callers` | Handles call arrival, escalation, cancellation and timeout |
+| `ed_net_monitor` | Observes the entire simulation |
 
-Model time is measured in minutes from the start of the shift. Every log line has a timestamp in the `[HH:MM]` format and identifies the process that produced it.
+The server routes messages between clients. Programs communicate through TCP sockets and can run on different computers.
 
-**## Project structure**
+## Project structure
 
 ```text
-hw_3_processes/
+hw_4_network/
 ├── incld/
 │   ├── config.h
 │   ├── dispatch.h
 │   ├── event_queue.h
 │   ├── generator.h
+│   ├── ipc.h
+│   ├── message.h
 │   ├── model.h
+│   ├── net.h
 │   ├── output.h
+│   ├── roles.h
+│   ├── sems.h
+│   ├── signals.h
 │   ├── simulation.h
 │   ├── utils.h
-│   ├── utils_extra.h
-│   ├── message.h
-│   ├── ipc.h
-│   ├── sems.h
-│   ├── roles.h
-│   └── signals.h
+│   └── utils_extra.h
 │
 ├── src/
 │   ├── main_server.c
 │   ├── main_client.c
+│   ├── main_monitor.c
+│   ├── net.c
+│   ├── ipc_net.c
+│   ├── ipc_shm.c
+│   ├── ipc_mq.c
 │   ├── config.c
 │   ├── dispatch.c
 │   ├── event_queue.c
 │   ├── generator.c
 │   ├── output.c
-│   ├── simulation.c
 │   ├── roles.c
 │   ├── signals.c
+│   ├── simulation.c
 │   ├── utils.c
-│   ├── ipc_shm.c
-│   ├── ipc_mq.c
 │   ├── sem_common.c
 │   ├── sem_named.c
 │   └── sem_unnamed.c
@@ -64,50 +71,78 @@ hw_3_processes/
 │       └── *.txt
 │
 ├── config.txt
-├── run_tests.sh
+├── run_network.sh
 ├── run_independent.sh
+├── run_tests.sh
 ├── ipc_cleanup.sh
 ├── Makefile
 └── README.md
 ```
 
-**## Command Line Interface**
+## Command Line Interface
 
-**#### Clock / Fork programs**
+### Server
 
 `-c <file>`             configuration file
 
-`-d <milliseconds>`     visual delay after every model minute with events (0 = no delay)
+`-p <port>`             TCP port (default: 5035)
 
-`-s <strategy>`         strategy of choosing a team
+`-b <address>`          interface to listen on
 
-`-l <file>`             log file
+`-T <seconds>`          client connection timeout (0 = unlimited)
+
+`-S`                    show status in the server terminal
+
+`-d <milliseconds>`     delay after every model minute with events
+
+`-s <strategy>`         team selection strategy
+
+`-l <file>`             central log file
 
 `-t <minutes>`          shift length (0 = unlimited)
 
-`-r <seed>`             enable random call generation with the specified seed
-
-`-n <name>`             IPC session name
+`-r <seed>`             enable random call generation
 
 `-h`                    help
 
-**#### Independent clients**
+### Role clients
 
-`-n <name>`             IPC session name (must match the clock)
+`-H <host>`             server address (default: 127.0.0.1)
 
-`-i <id>`               team ID (team program only; default: first available team)
+`-p <port>`             server port (default: 5035)
 
-`-w <seconds>`          how long to wait for the clock (default: 30)
+`-w <seconds>`          server connection timeout (default: 30)
 
-**#### Strategy**
+`-i <id>`               team ID (team program only)
 
-`nearest`
+`-l <file>`             local log file
 
-`fastest`
+`-h`                    help
+
+### Observer
+
+`-H <host>`             server address
+
+`-p <port>`             server port
+
+`-w <seconds>`          server connection timeout
+
+`-n <lines>`            number of recent events to display
+
+`-P`                    plain output mode
+
+`-h`                    help
+
+### Strategy
+
+- `nearest`
+- `fastest`
 
 Command-line options override the values from the configuration file.
 
-**## Configuration**
+Clients receive the configuration and simulation state from the server when they connect.
+
+## Configuration
 
 ```text
 delay_ms=120
@@ -130,145 +165,197 @@ random_interval=10
 # service time, max wait, escalation, cancellation
 ```
 
-**## Processes**
+## Processes
 
-Every entity with independent behaviour runs in its own process:
+Every entity with independent behaviour runs in a separate program:
 
-- Clock — owns model time and the event queue, wakes processes when their events occur, checks simulation invariants and prints the final summary
-- Dispatcher — receives reports and assigns available teams to waiting calls
-- Team — travels to calls, provides service, returns to base and schedules its next events
-- Call — waits for a team, escalates priority, cancels or gives up after the maximum waiting time
+- **Server** — owns model time and the event queue, routes messages, checks invariants and prints the final summary.
+- **Dispatcher** — assigns available teams to waiting calls.
+- **Team** — travels to calls, provides service and returns to base.
+- **Callers** — handles call arrival, priority escalation, cancellation and timeout.
+- **Observer** — displays the current state of the simulation without modifying it.
 
-In the fork versions, the clock is the parent process and creates child processes for the dispatcher, teams and calls.
+The server is the only program that communicates directly with all clients.
 
-In the independent versions, each role is implemented as a separate executable. The dispatcher, team and callers programs register with the clock when they start.
+## Interprocess Communication
 
-The signal thread from homework 2 is replaced by signal handlers using `sigaction()` in the clock process.
+The network implementation uses TCP sockets.
 
-**## Interprocess Communication**
+- `net.c` — TCP connections, frame serialization and network protocol.
+- `ipc_net.c` — message routing, client registration and observer communication.
+- `ipc.h` — common interface for all IPC implementations.
 
-Four implementations use the same simulation logic but different IPC mechanisms.
+Messages are exchanged through the server. Each client has a role and an address consisting of its role and index.
 
-`ed_fork_named`
+The server maintains message queues for roles, so messages are preserved when a client disconnects.
 
-- POSIX shared memory (`shm_open()` and `mmap()`)
-- Named POSIX semaphores (`sem_open()`)
-- Parent process creates child processes using `fork()`
+The implementations from homework 3 are also available:
 
-`ed_fork_unnamed`
+- `ed_fork_named` — `fork()`, POSIX shared memory and named semaphores.
+- `ed_fork_unnamed` — `fork()`, POSIX shared memory and unnamed semaphores.
+- `ed_shm_*` — independent programs using POSIX shared memory and named semaphores.
+- `ed_mq_*` — independent programs using POSIX message queues and named semaphores.
 
-- POSIX shared memory
-- Unnamed POSIX semaphores (`sem_init()` with `pshared = 1`)
-- Parent process creates child processes using `fork()`
+All implementations use the same simulation logic. Only the IPC layer differs.
 
-`ed_shm_*`
+## Network Protocol
 
-- POSIX shared memory
-- Named POSIX semaphores
-- Independent programs for the clock, dispatcher, teams and callers
+Every TCP message is transmitted as a frame containing:
 
-`ed_mq_*`
+- `magic` — protocol identifier (`ED35`);
+- `version` — protocol version;
+- `kind` — frame type;
+- `flags` — additional frame properties;
+- `dest_kind`, `dest_idx` — destination role and index;
+- `length` — payload size;
+- `payload` — serialized data.
 
-- POSIX message queues (`mq_open()`)
-- Named POSIX semaphores
-- Independent programs for the clock, dispatcher, teams and callers
-- No shared memory
+Frame types:
 
-Processes communicate through messages. In the shared-memory versions, messages are exchanged through bounded mailboxes protected by semaphores.
+- `NET_MESSAGE` — simulation message;
+- `NET_STATE` — complete simulation state;
+- `NET_LOG` — log line;
+- `NET_CONTROL` — user control request.
 
-In the message-queue version, every process maintains its own copy of the simulation model. Changes to calls and teams are sent using `MSG_SYNC` messages. The clock owns the event queue, and other processes request event scheduling through messages.
+All numeric fields are serialized in network byte order. TCP is a byte stream, so connections use buffers to collect and extract complete frames.
 
-**## One Step of the Clock**
+## One Step of the Clock
 
-1. The clock takes all events scheduled for the next model minute and sends `MSG_WAKE` messages to their owners.
-2. Calls and teams process their events in parallel. They can exchange messages and schedule new events.
-3. When all messages have been processed, the dispatcher receives `MSG_ROUND` and assigns available teams.
-4. The clock waits for the dispatching round to finish, checks simulation invariants and advances model time.
+1. The server takes events scheduled for the next model minute and sends `MSG_WAKE` to their owners.
+2. Clients process events in parallel, update their records and exchange messages through the server.
+3. After all counted messages are processed, the server sends `MSG_ROUND` to the dispatcher.
+4. The dispatcher assigns available teams.
+5. The server waits for all reactions, checks invariants, advances model time and publishes the new state to observers.
 
-The quiet counter tracks unhandled messages. The clock starts the next minute only after all reactions from the current minute have been completed.
+The server considers a message processed after receiving `MSG_DONE` from its recipient.
 
-In the shared-memory versions, the counter is stored in shared memory and protected by semaphores.
+## Client Disconnection and Reconnection
 
-In the message-queue version, the clock counts sent messages and receives `MSG_DONE` responses when they have been handled.
+- The server detects disconnected clients and logs the event.
+- Messages addressed to a disconnected role remain in its queue.
+- A client reconnecting with the same role receives the current simulation state and its pending messages.
+- The server preserves role statistics between connections.
+- `-T` specifies how long the server waits for a client to connect or reconnect.
+- Observers can connect and disconnect at any time without affecting the simulation.
 
-**## Semaphores**
+If the server terminates, all connected clients receive a shutdown message or detect the closed connection.
 
-The following semaphores are used for synchronization:
+## Signals
 
-- `world` — protects access to the shared simulation model
-- `output` — prevents processes from printing simultaneously
-- `quiet_lock`, `quiet_idle` — synchronize the quiet counter
-- `box_*_lock`, `box_*_filled`, `box_*_free` — implement producer-consumer mailboxes in shared memory
-- `sent` — tracks sent messages in the message-queue version
-- `ready`, `exited` — synchronize registration and termination of independent clients
-- `claim_dispatcher`, `claim_callers`, `claim_team<k>` — prevent multiple processes from taking the same role
+`SIGINT` (Ctrl+C), `SIGTERM` — stop the simulation; active calls are recorded as unserved.
 
-**## Signals**
-
-`SIGINT` (Ctrl+C), `SIGTERM` — stop the simulation; active calls are recorded as unserved;
-
-`SIGQUIT` (Ctrl+\\) — close call intake; finish active calls and then stop;
+`SIGQUIT` (Ctrl+\\) — close call intake; finish active calls before termination.
 
 `SIGUSR1` — print the current simulation status.
 
-Signals are handled by the clock process using `sigaction()`.
+Client signals are converted into `NET_CONTROL` messages and processed by the server. A signal in the observer terminal stops only that observer.
 
-Forked child processes ignore `SIGINT` and `SIGQUIT` and forward `SIGTERM` and `SIGUSR1` to the clock.
-
-Independent clients forward signals to the clock, so a signal received by any client can stop or control the whole simulation.
-
-**## Termination**
+## Termination
 
 - All calls are processed and the event queue is empty.
-- The shift limit is reached. Active calls are recorded as unserved.
-- `SIGINT` or `SIGTERM` is received. Active calls are recorded as unserved and the summary is printed.
-- `SIGQUIT` is received. No new calls are accepted; active calls are finished before termination.
-- A simulation process terminates unexpectedly. The clock detects the failure and stops the simulation with exit code 2.
+- The shift limit is reached.
+- `SIGINT` or `SIGTERM` is received.
+- `SIGQUIT` is received.
+- A client does not reconnect within the specified timeout.
 
-In every case, the clock sends `MSG_SHUTDOWN` to the other processes, waits for their termination, prints the summary and removes IPC resources.
+The server sends `MSG_SHUTDOWN` to clients, collects their statistics, prints the summary, sends the final state to observers and closes the connections.
 
 Exit codes:
 
 - `0` — normal termination
-- `1` — configuration, argument or IPC error
-- `2` — unexpected process termination
+- `1` — configuration, argument, socket or registration error
+- `2` — client lost or connection to the server lost
 
-**## Build and Launch**
+## Build and Launch
 
 1. Clean
 
-       make clean
+```bash
+make clean
+```
 
 2. Build
 
-       make
+```bash
+make
+```
 
 3. Launch
 
-**Fork versions (4–6 points)**
+**Network version — one terminal:**
 
-       ./bin/ed_fork_named -c config.txt
-       ./bin/ed_fork_unnamed -c config.txt
+```bash
+./run_network.sh -c config.txt
+./run_network.sh -m -c tests/test_stress.txt -d 50
+```
 
-**Independent programs with shared memory (7–8 points)**
+**Network version — separate terminals:**
 
-       ./run_independent.sh shm -c config.txt
+```bash
+./bin/ed_net_server -c config.txt -d 150
+./bin/ed_net_dispatcher -H 127.0.0.1
+./bin/ed_net_callers -H 127.0.0.1
+./bin/ed_net_team -H 127.0.0.1
+./bin/ed_net_monitor -H 127.0.0.1
+```
 
-**Independent programs with message queues (9–10 points)**
+Run one team client for each team in the configuration. Use `-i <id>` to specify a team ID.
 
-       ./run_independent.sh mq -c config.txt
-       ./run_independent.sh mq -c tests/test_stress.txt -d 50
+**Network version — different computers:**
+
+Server:
+
+```bash
+./bin/ed_net_server -c config.txt -p 5035
+```
+
+Clients:
+
+```bash
+./bin/ed_net_dispatcher -H <server_address> -p 5035
+./bin/ed_net_team -H <server_address> -p 5035 -i 1
+./bin/ed_net_callers -H <server_address> -p 5035
+./bin/ed_net_monitor -H <server_address> -p 5035
+```
+
+The configuration file is required only on the server.
+
+**Homework 3 implementations:**
+
+```bash
+./bin/ed_fork_named -c config.txt
+./bin/ed_fork_unnamed -c config.txt
+./run_independent.sh shm -c config.txt
+./run_independent.sh mq -c config.txt
+```
 
 4. Tests
 
-       make test
+```bash
+make test
+./run_tests.sh net
+```
 
 5. IPC cleanup
 
-       make ipc-clean
-
-`make ipc-clean` removes IPC objects left after an abnormal termination, for example after `kill -9`.
+```bash
+make ipc-clean
+```
 
 6. Remove build files
 
-       make clean
+```bash
+make clean
+```
+
+## The Log
+
+Every program writes its own log lines to its terminal and sends them to the server. The server writes the central log file and forwards log lines to observers.
+
+Example:
+
+```text
+[01:12] {B3  } B3 ARRIVED at EAST for CALL #007 (after 4 min of waiting)
+```
+
+`[HH:MM]` is the model time. The identifier in braces indicates the program that produced the line.

@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 #
-# Automatic tests of the emergency dispatch simulator (homework 3, processes).
+# Automatic tests of the emergency dispatch simulator (homework 4, network).
 #
-# Usage: ./run_tests.sh [fork_named] [fork_unnamed] [shm] [mq]   (default: all four)
+# Usage: ./run_tests.sh [net] [fork_named] [fork_unnamed] [shm] [mq]  (default: all five)
+#
+# "net" is the client-server version of homework 4, the other four variants are
+# the versions of homework 3 whose simulation logic it reuses.
 #
 # Every program is checked with the same scenarios:
 #  1. tests/test_*.txt   - the program must exit with code 0 and the log must
@@ -18,14 +21,21 @@
 #     stops with exit code 2 and removes the IPC objects;
 #  7. after every test no IPC object (shared memory, semaphore, queue) may remain;
 #  8. independent versions: clients started by hand, team chosen with -i,
-#     an extra client is refused, a client without a clock gives up.
+#     an extra client is refused, a client without a clock gives up;
+#  9. network version only: observers that come and go, a client that is killed
+#     and started again, a server that is killed, the address and the port of
+#     the command line, the requests of the user that travel as frames.
 
 set -u
 
 cd "$(dirname "$0")"
 
 VARIANTS=("$@")
-[ ${#VARIANTS[@]} -eq 0 ] && VARIANTS=(fork_named fork_unnamed shm mq)
+[ ${#VARIANTS[@]} -eq 0 ] && VARIANTS=(net fork_named fork_unnamed shm mq)
+
+# every run of the network version gets its own TCP port
+PORT_BASE=${PORT_BASE:-5600}
+PORT=$PORT_BASE
 
 OUT_DIR=$(mktemp -d)
 trap 'rm -rf "$OUT_DIR"' EXIT
@@ -63,6 +73,13 @@ common_checks() {
     return 0
 }
 
+# the lines of a log without the tag of the program and without the lines that
+# differ between two runs by design (addresses of the clients and their pids)
+log_body() {
+    sed 's/^\(\[[0-9:]*\]\) {[^}]*} /\1 /' "$1" |
+        grep -Ev 'CLIENT (CONNECTED|RECONNECTED|DISCONNECTED|FINISHED|LOST)|OBSERVER (CONNECTED|LEFT)|^Processes: '
+}
+
 # names of the IPC objects of this user that are still present
 ipc_left() {
     {
@@ -77,13 +94,24 @@ new_session() {
     SESSION="t$$_$counter"
 }
 
-# runs the current variant in the foreground: run_sim <args of the clock>
+# a new TCP port for the network version
+new_port() {
+    counter=$((counter + 1))
+    PORT=$((PORT_BASE + counter % 300))
+}
+
+# runs the current variant in the foreground: run_sim <args of the clock/server>
 run_sim() {
     case "$VARIANT" in
     fork_named | fork_unnamed) ./bin/ed_$VARIANT "$@" ;;
     shm | mq)
         new_session
         ./run_independent.sh "$VARIANT" -n "$SESSION" "$@"
+        ;;
+    net)
+        new_port
+        # -T 20: a test must not wait for a client for ever; an explicit -T wins
+        ./run_network.sh -T 20 -p "$PORT" "$@"
         ;;
     esac
 }
@@ -108,6 +136,17 @@ start_sim() {
             sleep 0.1
         done
         ;;
+    net)
+        new_port
+        ./run_network.sh -T 20 -p "$PORT" "$@" >"$OUT_DIR/bg.out" 2>&1 &
+        RUNNER=$!
+        CLOCK=""
+        for _ in $(seq 1 50); do
+            CLOCK=$(pgrep -f "ed_net_server .*-p $PORT" | head -1)
+            [ -n "$CLOCK" ] && break
+            sleep 0.1
+        done
+        ;;
     esac
 }
 
@@ -116,6 +155,7 @@ team_pid() {
     case "$VARIANT" in
     fork_named | fork_unnamed) pgrep -P "$CLOCK" | sed -n '2p' ;; # 1st child = dispatcher
     shm | mq) pgrep -f "ed_${VARIANT}_team -n $SESSION" | head -1 ;;
+    net) pgrep -f "ed_net_team .*-p $PORT" | head -1 ;;
     esac
 }
 
@@ -123,7 +163,7 @@ team_pid() {
 signal_target() {
     case "$VARIANT" in
     fork_named | fork_unnamed) echo "$CLOCK" ;;
-    shm | mq) team_pid ;; # the client must forward the signal to the clock
+    *) team_pid ;; # the client must pass the request of the user to the clock/server
     esac
 }
 
@@ -131,6 +171,7 @@ for VARIANT in "${VARIANTS[@]}"; do
     case "$VARIANT" in
     fork_named | fork_unnamed) need=bin/ed_$VARIANT ;;
     shm | mq) need=bin/ed_${VARIANT}_clock ;;
+    net) need=bin/ed_net_server ;;
     *) echo "unknown variant $VARIANT"; exit 1 ;;
     esac
 
@@ -188,6 +229,7 @@ for VARIANT in "${VARIANTS[@]}"; do
         # the independent versions: the clock refuses the file before the clients come
         case "$VARIANT" in
         fork_named | fork_unnamed) prog=./bin/ed_$VARIANT ;;
+        net) prog=./bin/ed_net_server ;;
         *) prog=./bin/ed_${VARIANT}_clock ;;
         esac
         if $prog -c "$config" -d 0 -l "$OUT_DIR/$name.log" >"$OUT_DIR/$name.out" 2>&1; then
@@ -211,7 +253,7 @@ for VARIANT in "${VARIANTS[@]}"; do
     start "same seed, same log"
     run_sim -c config.txt -d 0 -r 42 -t 300 -l "$OUT_DIR/r1.log" >/dev/null 2>&1
     run_sim -c config.txt -d 0 -r 42 -t 300 -l "$OUT_DIR/r2.log" >/dev/null 2>&1
-    if cmp -s <(sed 's/{[^}]*} //' "$OUT_DIR/r1.log" | sort) <(sed 's/{[^}]*} //' "$OUT_DIR/r2.log" | sort) &&
+    if cmp -s <(log_body "$OUT_DIR/r1.log" | sort) <(log_body "$OUT_DIR/r2.log" | sort) &&
         grep -q 'GENERATOR' "$OUT_DIR/r1.log" && reason=$(common_checks "$OUT_DIR/r1.log"); then
         pass
     else
@@ -224,7 +266,7 @@ for VARIANT in "${VARIANTS[@]}"; do
     ok=1
     for run in $(seq 1 20); do
         run_sim -c tests/test_stress.txt -d 0 -l "$OUT_DIR/run.log" >/dev/null 2>&1
-        if ! cmp -s <(sed 's/{[^}]*} //' "$OUT_DIR/ref.log" | sort) <(sed 's/{[^}]*} //' "$OUT_DIR/run.log" | sort); then
+        if ! cmp -s <(log_body "$OUT_DIR/ref.log" | sort) <(log_body "$OUT_DIR/run.log" | sort); then
             ok=0; break
         fi
     done
@@ -239,7 +281,7 @@ for VARIANT in "${VARIANTS[@]}"; do
     for seed in $(seq 1 60); do
         prefix=""
         [ $((seed % 2)) -eq 0 ] && prefix=$pin
-        if ! timeout 20 $prefix bash -c "$(declare -f run_sim new_session); VARIANT=$VARIANT; counter=$seed$$; run_sim -c tests/test_stress.txt -d 0 -r $seed -t 400 -l $OUT_DIR/dl.log" >/dev/null 2>&1 ||
+        if ! timeout 25 $prefix bash -c "$(declare -f run_sim new_session new_port); VARIANT=$VARIANT; PORT_BASE=$PORT_BASE; counter=$seed$$; run_sim -c tests/test_stress.txt -d 0 -r $seed -t 400 -l $OUT_DIR/dl.log" >/dev/null 2>&1 ||
             ! reason=$(common_checks "$OUT_DIR/dl.log"); then
             ok=0; break
         fi
@@ -301,13 +343,16 @@ for VARIANT in "${VARIANTS[@]}"; do
     fi
 
     start "SIGKILL of a team process"
-    start_sim -c config.txt -d 30 -l "$OUT_DIR/kill.log"
+    # the network server waits for the client of the role: -T 5 says how long
+    [ "$VARIANT" = "net" ] && KILL_EXTRA=(-T 5) || KILL_EXTRA=()
+    start_sim "${KILL_EXTRA[@]}" -c config.txt -d 30 -l "$OUT_DIR/kill.log"
     sleep 1.2
     kill -KILL "$(team_pid)"
     wait "$RUNNER"
     code=$?
     sleep 0.2
-    if [ "$code" -eq 2 ] && grep -q 'PROCESS FAILURE' "$OUT_DIR/kill.log" &&
+    if [ "$VARIANT" = "net" ]; then failure_mark='CLIENT LOST'; else failure_mark='PROCESS FAILURE'; fi
+    if [ "$code" -eq 2 ] && grep -q "$failure_mark" "$OUT_DIR/kill.log" &&
         grep -q '^Stop reason: a process terminated unexpectedly' "$OUT_DIR/kill.log" && [ -z "$(ipc_left)" ] &&
         [ -z "$(pgrep -f "ed_${VARIANT}")" ]; then
         pass
@@ -319,6 +364,7 @@ for VARIANT in "${VARIANTS[@]}"; do
     echo "=== Command line ==="
     case "$VARIANT" in
     fork_named | fork_unnamed) prog=./bin/ed_$VARIANT ;;
+    net) prog=./bin/ed_net_server ;;
     *) prog=./bin/ed_${VARIANT}_clock ;;
     esac
 
@@ -384,6 +430,178 @@ for VARIANT in "${VARIANTS[@]}"; do
         else
             fail "clock code $code, IPC or processes left"
         fi
+    fi
+
+    if [ "$VARIANT" = "net" ]; then
+        echo "=== Network: start by hand, address and port ==="
+        start "clients by hand, -i, extra, -b"
+        # the server listens on the loopback interface only, the clients get the
+        # address and the port in the command line
+        new_port
+        ./bin/ed_net_server -b 127.0.0.1 -p "$PORT" -c tests/test_fastest.txt -d 0 -T 20 \
+            -l "$OUT_DIR/hand.log" >"$OUT_DIR/hand.out" 2>&1 &
+        server=$!
+        sleep 0.3
+        ./bin/ed_net_team -H 127.0.0.1 -p "$PORT" -i 2 -w 10 >"$OUT_DIR/team2.out" 2>&1 &
+        t2=$!
+        sleep 0.2
+        ./bin/ed_net_callers -H 127.0.0.1 -p "$PORT" -w 10 >/dev/null 2>&1 &
+        cl=$!
+        # a client works in any directory: it needs no configuration file at all
+        here=$PWD
+        (cd / && exec "$here/bin/ed_net_team" -H 127.0.0.1 -p "$PORT" -w 10) >"$OUT_DIR/team1.out" 2>&1 &
+        t1=$!
+        sleep 0.3
+        ./bin/ed_net_team -H 127.0.0.1 -p "$PORT" -w 2 >"$OUT_DIR/extra.out" 2>&1 # no free team
+        extra=$?
+        ./bin/ed_net_dispatcher -H 127.0.0.1 -p "$PORT" -w 10 >/dev/null 2>&1 &
+        dp=$!
+        wait "$server"
+        code=$?
+        wait "$t1" "$t2" "$cl" "$dp" 2>/dev/null
+        if [ "$code" -eq 0 ] && [ "$extra" -ne 0 ] && grep -q 'plays team B2' "$OUT_DIR/team2.out" &&
+            grep -q 'plays team B1' "$OUT_DIR/team1.out" && grep -q 'already played' "$OUT_DIR/extra.out" &&
+            grep -q "listens on 127.0.0.1:$PORT" "$OUT_DIR/hand.out" && reason=$(common_checks "$OUT_DIR/hand.log"); then
+            pass
+        else
+            fail "${reason:-server code $code, extra code $extra}"
+        fi
+
+        start "client without a server"
+        new_port
+        if ./bin/ed_net_team -H 127.0.0.1 -p "$PORT" -w 1 >/dev/null 2>&1; then
+            fail "the client did not give up"
+        else
+            pass
+        fi
+
+        start "client with a wrong port"
+        new_port
+        wrong=$((PORT + 1))
+        ./bin/ed_net_server -b 127.0.0.1 -p "$PORT" -c tests/test_single_call.txt -d 0 -T 10 \
+            -l "$OUT_DIR/wrong.log" >/dev/null 2>&1 &
+        server=$!
+        sleep 0.3
+        ./bin/ed_net_team -H 127.0.0.1 -p "$wrong" -w 1 >/dev/null 2>&1
+        bad=$?
+        kill -INT "$server" 2>/dev/null
+        wait "$server" 2>/dev/null
+        if [ "$bad" -ne 0 ]; then pass; else fail "a client reached a port where nobody listens"; fi
+
+        echo "=== Network: observers ==="
+        start "observers come and go"
+        new_port
+        ./bin/ed_net_dispatcher -H 127.0.0.1 -p "$PORT" -w 10 >/dev/null 2>&1 &
+        dp=$!
+        ./bin/ed_net_callers -H 127.0.0.1 -p "$PORT" -w 10 >/dev/null 2>&1 &
+        cl=$!
+        teams=$(awk '/^\[/{s=$0; next} s=="[TEAMS]" && $0 !~ /^[ \t]*(#|$)/ {n++} END{print n+0}' tests/test_stress.txt)
+        tpids=()
+        for ((t = 0; t < teams; t++)); do
+            ./bin/ed_net_team -H 127.0.0.1 -p "$PORT" -w 10 >/dev/null 2>&1 &
+            tpids+=($!)
+        done
+        ./bin/ed_net_monitor -H 127.0.0.1 -p "$PORT" -w 10 -P >"$OUT_DIR/obs1.out" 2>&1 &
+        obs1=$!
+        ./bin/ed_net_server -c tests/test_stress.txt -d 120 -T 20 -p "$PORT" \
+            -l "$OUT_DIR/obs.log" >"$OUT_DIR/obs.out" 2>&1 &
+        server=$!
+        sleep 1.5
+        # a second observer comes while the model is running, the first one leaves
+        ./bin/ed_net_monitor -H 127.0.0.1 -p "$PORT" -w 10 -P >"$OUT_DIR/obs2.out" 2>&1 &
+        obs2=$!
+        sleep 0.7
+        kill -INT "$obs1"
+        wait "$server"
+        code=$?
+        wait "$obs1" "$obs2" "$dp" "$cl" "${tpids[@]}" 2>/dev/null
+        if [ "$code" -eq 0 ] && grep -q 'STATE waiting=' "$OUT_DIR/obs1.out" &&
+            grep -q 'CALL #' "$OUT_DIR/obs1.out" && grep -q 'FINAL stop_reason' "$OUT_DIR/obs2.out" &&
+            grep -q 'observers=2' "$OUT_DIR/obs2.out" && grep -q 'OBSERVER LEFT' "$OUT_DIR/obs.log" &&
+            reason=$(common_checks "$OUT_DIR/obs.log"); then
+            pass
+        else
+            fail "${reason:-server code $code, the observers did not see the application}"
+        fi
+
+        echo "=== Network: a client that is killed and started again ==="
+        start "team client restarted, run goes on"
+        new_port
+        ./bin/ed_net_dispatcher -H 127.0.0.1 -p "$PORT" -w 10 >/dev/null 2>&1 &
+        dp=$!
+        ./bin/ed_net_callers -H 127.0.0.1 -p "$PORT" -w 10 >/dev/null 2>&1 &
+        cl=$!
+        ./bin/ed_net_team -H 127.0.0.1 -p "$PORT" -w 10 -i 1 >/dev/null 2>&1 &
+        victim=$!
+        ./bin/ed_net_team -H 127.0.0.1 -p "$PORT" -w 10 -i 2 >/dev/null 2>&1 &
+        t2=$!
+        ./bin/ed_net_team -H 127.0.0.1 -p "$PORT" -w 10 -i 3 >/dev/null 2>&1 &
+        t3=$!
+        ./bin/ed_net_server -c tests/test_stress.txt -d 120 -p "$PORT" \
+            -l "$OUT_DIR/again.log" >"$OUT_DIR/again.out" 2>&1 &
+        server=$!
+        sleep 1.5
+        kill -9 "$victim" 2>/dev/null
+        sleep 1.5
+        ./bin/ed_net_team -H 127.0.0.1 -p "$PORT" -w 10 -i 1 >/dev/null 2>&1 &
+        back=$!
+        wait "$server"
+        code=$?
+        wait "$dp" "$cl" "$t2" "$t3" "$back" 2>/dev/null
+        if [ "$code" -eq 0 ] && grep -q 'CLIENT DISCONNECTED: team B1' "$OUT_DIR/again.log" &&
+            grep -q 'CLIENT RECONNECTED: team B1' "$OUT_DIR/again.log" &&
+            grep -q 'SHIFT FINISHED' "$OUT_DIR/again.log" && reason=$(common_checks "$OUT_DIR/again.log"); then
+            pass
+        else
+            fail "${reason:-server code $code, the run did not survive the restart of a client}"
+        fi
+
+        echo "=== Network: the server goes away ==="
+        start "server killed, clients exit"
+        new_port
+        ./run_network.sh -T 20 -p "$PORT" -c tests/test_stress.txt -d 150 \
+            -l "$OUT_DIR/gone.log" >"$OUT_DIR/gone.out" 2>&1 &
+        runner=$!
+        server=""
+        for _ in $(seq 1 50); do
+            server=$(pgrep -f "ed_net_server .*-p $PORT" | head -1)
+            [ -n "$server" ] && break
+            sleep 0.1
+        done
+        sleep 1.5
+        kill -9 "$server" 2>/dev/null
+        sleep 2
+        left=$(pgrep -cf "ed_net_(team|dispatcher|callers|monitor) .*-p $PORT" || true)
+        wait "$runner" 2>/dev/null
+        if [ "${left:-0}" -eq 0 ] && grep -q 'connection to the server is gone' "$OUT_DIR/gone.out"; then
+            pass
+        else
+            fail "$left client(s) stayed alive without the server"
+            pkill -9 -f "ed_net_.* -p $PORT" 2>/dev/null
+        fi
+
+        start "server shutdown ends the clients"
+        new_port
+        ./run_network.sh -T 20 -p "$PORT" -c tests/test_stress.txt -d 0 \
+            -l "$OUT_DIR/bye.log" >"$OUT_DIR/bye.out" 2>&1
+        code=$?
+        sleep 0.5
+        left=$(pgrep -cf "ed_net_.* -p $PORT" || true)
+        if [ "$code" -eq 0 ] && [ "${left:-0}" -eq 0 ] &&
+            [ "$(grep -c 'the shift is over, exiting' "$OUT_DIR/bye.out")" -ge 5 ]; then
+            pass
+        else
+            fail "code $code, $left program(s) left"
+        fi
+
+        echo "=== Network: command line of the clients ==="
+        for client in dispatcher team callers monitor; do
+            start "-h of ed_net_$client"
+            if ./bin/ed_net_$client -h >/dev/null 2>&1; then pass; else fail "-h must exit with 0"; fi
+        done
+
+        start "ed_net_monitor -p abc"
+        if ./bin/ed_net_monitor -p abc -w 1 >/dev/null 2>&1; then fail "a wrong port was accepted"; else pass; fi
     fi
 done
 

@@ -3,6 +3,10 @@
 
 #include <sys/types.h>
 
+#define SIGNAL_REQUEST_STOP 1     // the user pressed Ctrl+C in the terminal of a client
+#define SIGNAL_REQUEST_CLOSE 2    // Ctrl+\ in the terminal of a client
+#define SIGNAL_REQUEST_SNAPSHOT 3 // SIGUSR1 in a client
+
 /**
  * @struct ControlRequests
  * @brief Requests of the user received with signals by the clock process
@@ -29,6 +33,9 @@ int signals_install_child(pid_t clock_pid);
 
 // Independent client
 int signals_install_client(pid_t clock_pid);
+
+// Server of the network version: a request that came from a client as a frame
+void signals_remote_request(int request, int signal_number);
 
 // Name of a signal for the log
 const char *signal_text(int number);

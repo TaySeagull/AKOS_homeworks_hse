@@ -1,4 +1,7 @@
-[00:00] {CLK } SHIFT STARTED: districts=2 teams=1 calls=2; processes: clock, dispatcher, 1 teams, 1 callers process for all calls
+[00:00] {CLK } CLIENT CONNECTED: dispatcher from 127.0.0.1:47906 (pid 38517)
+[00:00] {CLK } CLIENT CONNECTED: team B1 from 127.0.0.1:47912 (pid 38518)
+[00:00] {CLK } CLIENT CONNECTED: callers from 127.0.0.1:47928 (pid 38519)
+[00:00] {CLK } SHIFT STARTED: districts=2 teams=1 calls=2; processes: clock, dispatcher, 1 teams, 1 callers client for all calls
 [00:00] {C001} CALL #001 ARRIVED: district=NORTH (x=1, y=1) priority=1 spec=MEDIC service=5 min max_wait=20 min
 [00:00] {C002} CALL #002 ARRIVED: district=NORTH (x=2, y=2) priority=1 spec=MEDIC service=5 min max_wait=20 min
 [00:00] {DSP } DISPATCH: CALL #001 priority=1 spec=MEDIC waited 0 min -> B1 (NEAREST strategy)
@@ -12,6 +15,9 @@
 [00:07] {B1  } B1 RETURNED to base BASE and is AVAILABLE
 [00:07] {CLK } ALL CALLS PROCESSED
 [00:07] {CLK } SHIFT FINISHED
+[00:07] {CLK } CLIENT FINISHED: dispatcher
+[00:07] {CLK } CLIENT FINISHED: team B1
+[00:07] {CLK } CLIENT FINISHED: callers
 
 === SHIFT SUMMARY ===
 Stop reason: all calls processed
@@ -26,4 +32,4 @@ Average service: 5.00 min/call
 Simulation end: 7 min
 Processed events: 6
 Invariant violations: 0
-Processes: 4 (independent + named POSIX sems + POSIX shm)
+Processes: 4 (TCP client-server, server listens on 0.0.0.0:5601)

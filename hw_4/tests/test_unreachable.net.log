@@ -1,9 +1,15 @@
-[00:00] {CLK } SHIFT STARTED: districts=2 teams=1 calls=1; processes: clock, dispatcher, 1 teams, 1 process per call
+[00:00] {CLK } CLIENT CONNECTED: team B1 from 127.0.0.1:59420 (pid 38934)
+[00:00] {CLK } CLIENT CONNECTED: dispatcher from 127.0.0.1:59418 (pid 38933)
+[00:00] {CLK } CLIENT CONNECTED: callers from 127.0.0.1:59426 (pid 38935)
+[00:00] {CLK } SHIFT STARTED: districts=2 teams=1 calls=1; processes: clock, dispatcher, 1 teams, 1 callers client for all calls
 [00:00] {C001} CALL #001 ARRIVED: district=ISLAND (x=1, y=1) priority=1 spec=MEDIC service=5 min max_wait=15 min
 [00:00] {DSP } SEARCH: no free MEDIC team can reach ISLAND; CALL #001 is queued (waiting calls: 1)
 [00:15] {C001} CALL #001 UNSERVED: maximum waiting time 15 min exceeded
 [00:15] {CLK } ALL CALLS PROCESSED
 [00:15] {CLK } SHIFT FINISHED
+[00:15] {CLK } CLIENT FINISHED: dispatcher
+[00:15] {CLK } CLIENT FINISHED: callers
+[00:15] {CLK } CLIENT FINISHED: team B1
 
 === SHIFT SUMMARY ===
 Stop reason: all calls processed
@@ -18,4 +24,4 @@ Average service: 0.00 min/call
 Simulation end: 15 min
 Processed events: 2
 Invariant violations: 0
-Processes: 4 (fork + unnamed POSIX sems in POSIX shm)
+Processes: 4 (TCP client-server, server listens on 0.0.0.0:5611)

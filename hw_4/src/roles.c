@@ -393,7 +393,16 @@ int role_loop(Simulation *sim, Role role, int idx)
         if (message.type == MSG_SHUTDOWN) // not counted as work
             break;
 
-        ipc_apply(sim, &message); // message-queue version: refresh the mirror
+        // network version: the server has sent the whole state (first connection
+        // or a client that was started again). The mirror is fresh already, the
+        // dispatcher only has to plan again, and the server expects no answer.
+        if (message.type == MSG_RESYNC)
+        {
+            dispatcher.dirty = 1;
+            continue;
+        }
+
+        ipc_apply(sim, &message); // message-queue and network version: refresh the mirror
 
         switch (role)
         {
