@@ -1,0 +1,33 @@
+[00:00] {CLK } CLIENT CONNECTED: team B1 from 127.0.0.1:60026 (pid 38644)
+[00:00] {CLK } CLIENT CONNECTED: dispatcher from 127.0.0.1:60024 (pid 38643)
+[00:00] {CLK } CLIENT CONNECTED: team B2 from 127.0.0.1:60044 (pid 38645)
+[00:00] {CLK } CLIENT CONNECTED: callers from 127.0.0.1:60054 (pid 38646)
+[00:00] {CLK } SHIFT STARTED: districts=3 teams=2 calls=1; processes: clock, dispatcher, 2 teams, 1 callers client for all calls
+[00:00] {C001} CALL #001 ARRIVED: district=EAST (x=1, y=1) priority=1 spec=MEDIC service=5 min max_wait=20 min
+[00:00] {DSP } DISPATCH: CALL #001 priority=1 spec=MEDIC waited 0 min -> B1 (NEAREST strategy)
+[00:00] {B1  } B1 DEPARTED from BASE to EAST for CALL #001, travel TIME=2 min
+[00:02] {B1  } B1 ARRIVED at EAST for CALL #001 (after 2 min of waiting)
+[00:02] {B1  } B1 STARTED HELP on CALL #001, it will take 5 min
+[00:07] {B1  } CALL #001 HELP FINISHED by B1; total wait=2 min, service=5 min
+[00:07] {B1  } B1 RELEASED and AVAILABLE in district EAST
+[00:07] {CLK } ALL CALLS PROCESSED
+[00:07] {CLK } SHIFT FINISHED
+[00:07] {CLK } CLIENT FINISHED: dispatcher
+[00:07] {CLK } CLIENT FINISHED: team B1
+[00:07] {CLK } CLIENT FINISHED: callers
+[00:07] {CLK } CLIENT FINISHED: team B2
+
+=== SHIFT SUMMARY ===
+Stop reason: all calls processed
+Calls received: 1
+Served: 1
+Cancelled: 0
+Unserved: 0
+Dispatches: 1
+Priority escalations: 0
+Average waiting: 2.00 min/call
+Average service: 5.00 min/call
+Simulation end: 7 min
+Processed events: 3
+Invariant violations: 0
+Processes: 5 (TCP client-server, server listens on 0.0.0.0:5604)

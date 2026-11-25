@@ -1,0 +1,7 @@
+delay_ms=fast
+[DISTRICTS]
+BASE 0
+[TEAMS]
+1 MEDIC 30 BASE
+[CALLS]
+1 0 BASE 1 1 1 MEDIC 5 20 0 0

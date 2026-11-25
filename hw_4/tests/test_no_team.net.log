@@ -1,0 +1,27 @@
+[00:00] {CLK } CLIENT CONNECTED: dispatcher from 127.0.0.1:58946 (pid 38723)
+[00:00] {CLK } CLIENT CONNECTED: team B1 from 127.0.0.1:58956 (pid 38724)
+[00:00] {CLK } CLIENT CONNECTED: callers from 127.0.0.1:58962 (pid 38725)
+[00:00] {CLK } SHIFT STARTED: districts=2 teams=1 calls=1; processes: clock, dispatcher, 1 teams, 1 callers client for all calls
+[00:00] {C001} CALL #001 ARRIVED: district=NORTH (x=1, y=1) priority=1 spec=FIRE service=5 min max_wait=10 min
+[00:00] {DSP } SEARCH: no free FIRE team can reach NORTH; CALL #001 is queued (waiting calls: 1)
+[00:10] {C001} CALL #001 UNSERVED: maximum waiting time 10 min exceeded
+[00:10] {CLK } ALL CALLS PROCESSED
+[00:10] {CLK } SHIFT FINISHED
+[00:10] {CLK } CLIENT FINISHED: dispatcher
+[00:10] {CLK } CLIENT FINISHED: team B1
+[00:10] {CLK } CLIENT FINISHED: callers
+
+=== SHIFT SUMMARY ===
+Stop reason: all calls processed
+Calls received: 1
+Served: 0
+Cancelled: 0
+Unserved: 1
+Dispatches: 0
+Priority escalations: 0
+Average waiting: 0.00 min/call
+Average service: 0.00 min/call
+Simulation end: 10 min
+Processed events: 2
+Invariant violations: 0
+Processes: 4 (TCP client-server, server listens on 0.0.0.0:5606)
